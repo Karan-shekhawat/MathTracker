@@ -14,7 +14,7 @@ import AnalyticsView from './components/AnalyticsView';
 type ViewType = 'dashboard' | 'syllabus' | 'import' | 'practice' | 'mocks' | 'errorbook' | 'analytics';
 
 function AppContent() {
-  const { user, loading, signOut } = useAuth();
+  const { user, isGuest, loading } = useAuth();
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
@@ -33,8 +33,8 @@ function AppContent() {
     );
   }
 
-  // Show login screen if not authenticated
-  if (!user) {
+  // Show login screen if not authenticated and not in guest mode
+  if (!user && !isGuest) {
     return <LoginScreen />;
   }
 
@@ -99,7 +99,7 @@ function AppContent() {
   };
 
   return (
-    <AppStateProvider userId={user.uid}>
+    <AppStateProvider userId={user ? user.uid : 'guest'}>
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row antialiased font-sans transition-colors duration-300">
         {/* Navigation Sidebar Drawer (Hidden during active Practice sessions) */}
         {currentView !== 'practice' && (

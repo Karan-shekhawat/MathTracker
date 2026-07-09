@@ -4,15 +4,20 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface AuthContextType {
   user: User | null;
+  isGuest: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  continueAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isGuest, setIsGuest] = useState<boolean>(() => {
+    return localStorage.getItem('math_tracker_guest_mode') === 'true';
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUser(session.user);
+        setIsGuest(false);
+        localStorage.removeItem('math_tracker_guest_mode');
+      }
       setLoading(false);
     }).catch((err) => {
       console.error('Failed to get session:', err);
@@ -33,7 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event: string, session: Session | null) => {
-        setUser(session?.user ?? null);
+        if (session?.user) {
+          setUser(session.user);
+          setIsGuest(false);
+          localStorage.removeItem('math_tracker_guest_mode');
+        } else {
+          setUser(null);
+        }
         setLoading(false);
       }
     );
@@ -58,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    setIsGuest(false);
+    localStorage.removeItem('math_tracker_guest_mode');
     if (!isSupabaseConfigured) return;
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -66,8 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const continueAsGuest = () => {
+    setIsGuest(true);
+    localStorage.setItem('math_tracker_guest_mode', 'true');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, isGuest, loading, signInWithGoogle, signOut, continueAsGuest }}>
       {children}
     </AuthContext.Provider>
   );

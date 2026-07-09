@@ -63,6 +63,30 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
   useEffect(() => {
     const loadData = async () => {
       try {
+        if (userId === 'guest') {
+          // Guest Mode - load exclusively from localStorage
+          const saved = localStorage.getItem('anki_ssc_maths_state_v5_clean');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved) as AppState;
+              setTopics(parsed.topics || []);
+              setQuestions(parsed.questions || []);
+              setPracticeSessions(parsed.practiceSessions || []);
+              setMockTests(parsed.mockTests || []);
+              setErrorBook(parsed.errorBook || []);
+              setPastImports(parsed.pastImports || []);
+              setTheme(parsed.theme || 'dark');
+            } catch (e) {
+              console.error('Failed to parse saved state', e);
+              initializeDefaultState();
+            }
+          } else {
+            initializeDefaultState();
+          }
+          setIsInitialized(true);
+          return;
+        }
+
         // Try loading from Firestore first
         const cloudState = await loadFullState(userId);
 
@@ -149,6 +173,10 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
       };
       // Also keep localStorage as a fast local cache
       localStorage.setItem('anki_ssc_maths_state_v5_clean', JSON.stringify(state));
+
+      if (userId === 'guest') {
+        return; // Skip cloud sync in guest mode
+      }
 
       // Debounce Firestore writes to avoid excessive writes
       if (saveTimeoutRef.current) {
@@ -1046,9 +1074,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
 
   const resetAllData = () => {
     localStorage.removeItem('anki_ssc_maths_state_v5_clean');
-    deleteAllUserData(userId).catch(err =>
-      console.error('Failed to delete Firestore data:', err)
-    );
+    if (userId !== 'guest') {
+      deleteAllUserData(userId).catch(err =>
+        console.error('Failed to delete Firestore data:', err)
+      );
+    }
     initializeDefaultState();
   };
 

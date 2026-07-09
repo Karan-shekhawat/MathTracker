@@ -1,4 +1,5 @@
 import { useAppState } from '../context/AppStateContext';
+import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   BookOpen,
@@ -14,7 +15,9 @@ import {
   Upload,
   Settings,
   Menu,
-  X
+  X,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { useState, useRef, ChangeEvent } from 'react';
 
@@ -28,7 +31,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentView, onViewChange, mobileOpen, setMobileOpen }: SidebarProps) {
-  const { theme, toggleTheme, resetAllData, topics, questions, mockTests, errorBook, practiceSessions } = useAppState();
+  const { theme, toggleTheme, resetAllData } = useAppState();
+  const { user, isGuest, signOut } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +48,7 @@ export default function Sidebar({ currentView, onViewChange, mobileOpen, setMobi
 
   // Export Local Backup
   const handleExport = () => {
-    const saved = localStorage.getItem('anki_ssc_maths_state');
+    const saved = localStorage.getItem('anki_ssc_maths_state_v5_clean');
     if (!saved) {
       alert('No data found to export!');
       return;
@@ -75,11 +79,11 @@ export default function Sidebar({ currentView, onViewChange, mobileOpen, setMobi
         const text = e.target?.result as string;
         const parsed = JSON.parse(text);
         if (parsed.topics && parsed.questions) {
-          localStorage.setItem('anki_ssc_maths_state', text);
+          localStorage.setItem('anki_ssc_maths_state_v5_clean', text);
           alert('Backup restored successfully! The page will now reload to apply changes.');
           window.location.reload();
         } else {
-          alert('Invalid backup format. Make sure it is a valid Anki-Style SSC Maths Practice JSON file.');
+          alert('Invalid backup format. Make sure it is a valid backup JSON file.');
         }
       } catch (err) {
         alert('Failed to parse backup file. Please ensure it is a valid JSON file.');
@@ -132,8 +136,6 @@ export default function Sidebar({ currentView, onViewChange, mobileOpen, setMobi
             <span className="text-[10px] font-mono text-slate-400">SSC CGL Practice Tool</span>
           </div>
         </div>
-
-
 
         {/* Navigation Area */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
@@ -237,8 +239,29 @@ export default function Sidebar({ currentView, onViewChange, mobileOpen, setMobi
             </button>
           </div>
 
+          {/* Authentication Action Button (Sign In / Sign Out) */}
+          <div className="pt-1">
+            {user ? (
+              <button
+                onClick={() => signOut()}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-medium border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-950/40 hover:bg-rose-950/20 transition-all cursor-pointer"
+              >
+                <LogOut size={13} />
+                <span>Sign Out ({user.email?.split('@')[0]})</span>
+              </button>
+            ) : isGuest ? (
+              <button
+                onClick={() => signOut()} // signOut clears guest state and returns to login card
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-medium border border-slate-800 bg-indigo-950/30 text-indigo-400 border-indigo-900/30 hover:text-indigo-300 hover:bg-indigo-900/40 hover:border-indigo-800/40 transition-all cursor-pointer"
+              >
+                <LogIn size={13} />
+                <span>Sign In to Sync Data</span>
+              </button>
+            ) : null}
+          </div>
+
           <div className="text-[10px] text-center text-slate-500 font-mono pt-1">
-            v1.0.0 • Local Storage Auto-Saved
+            {user ? 'Cloud Synced (Supabase)' : 'Guest Mode (Local Storage)'}
           </div>
         </div>
       </aside>
