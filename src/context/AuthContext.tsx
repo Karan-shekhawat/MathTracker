@@ -1,11 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import {
-  User,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-} from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -21,26 +16,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: string, session: Session | null) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + (import.meta.env.BASE_URL || '/'),
+      },
+    });
+    if (error) {
       console.error('Google sign-in error:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (error: any) {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
       console.error('Sign-out error:', error);
       throw error;
     }

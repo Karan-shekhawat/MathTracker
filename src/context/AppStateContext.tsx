@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Topic, Subtopic, Concept, Question, MockTest, PracticeSession, ErrorBookItem, FailureReason, AppState, PastImport } from '../types';
-import { saveFullState, loadFullState, deleteAllUserData } from '../lib/firestore';
+import { saveFullState, loadFullState, deleteAllUserData } from '../lib/supabaseDb';
 
 interface AppContextType {
   topics: Topic[];
