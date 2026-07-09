@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { isSupabaseConfigured } from '../supabase';
 
 export default function LoginScreen() {
   const { signInWithGoogle } = useAuth();
@@ -17,6 +18,91 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
+
+  // If Supabase keys are missing, show a beautiful, helpful configuration guide
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="dark min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Animated background orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute w-96 h-96 rounded-full opacity-10 blur-3xl"
+            style={{
+              background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+              top: '-10%',
+              left: '-10%',
+              animation: 'float 8s ease-in-out infinite',
+            }}
+          />
+          <div
+            className="absolute w-80 h-80 rounded-full opacity-10 blur-3xl"
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              bottom: '-10%',
+              right: '-10%',
+              animation: 'float 10s ease-in-out infinite reverse',
+            }}
+          />
+        </div>
+
+        <style>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-25px) scale(1.03); }
+          }
+        `}</style>
+
+        <div className="relative z-10 w-full max-w-lg">
+          <div
+            className="rounded-2xl p-8 md:p-10 border border-red-500/20"
+            style={{
+              background: 'linear-gradient(145deg, rgba(20, 10, 15, 0.85), rgba(15, 23, 42, 0.98))',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px -5px rgba(239, 68, 68, 0.08)',
+            }}
+          >
+            {/* Warning Icon */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 bg-red-500/10 border border-red-500/20 text-red-500 animate-pulse">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-100 font-display tracking-tight">
+                Configuration Required
+              </h1>
+              <p className="text-slate-400 mt-2 text-sm md:text-base">
+                Your local environment variables are not set up yet.
+              </p>
+            </div>
+
+            {/* Explainer / Steps */}
+            <div className="space-y-4 text-sm text-slate-300 bg-slate-900/50 p-5 rounded-xl border border-slate-800">
+              <p className="font-semibold text-red-400">Missing configuration keys:</p>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-400 font-mono text-xs">
+                <li>VITE_SUPABASE_URL</li>
+                <li>VITE_SUPABASE_ANON_KEY</li>
+              </ul>
+              
+              <div className="h-px bg-slate-800 my-4" />
+
+              <p className="font-semibold text-slate-200">How to fix this:</p>
+              <ol className="list-decimal list-inside space-y-2 text-slate-300">
+                <li>Create a copy of <code className="px-1.5 py-0.5 rounded bg-slate-950 text-indigo-400 font-mono text-xs">.env.example</code> and rename it to <code className="px-1.5 py-0.5 rounded bg-slate-950 text-indigo-400 font-mono text-xs">.env</code>.</li>
+                <li>Open your <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 underline font-semibold">Supabase Dashboard</a>.</li>
+                <li>Go to **Settings → API** and copy your **Project URL** & **anon key**.</li>
+                <li>Paste them into your <code className="px-1.5 py-0.5 rounded bg-slate-950 text-indigo-400 font-mono text-xs">.env</code> file.</li>
+                <li>Restart the development server.</li>
+              </ol>
+            </div>
+
+            {/* Note about GitHub Actions */}
+            <p className="text-center text-slate-500 text-xs mt-6 leading-relaxed">
+              For live production sites, make sure you add these key-value pairs as **GitHub Secrets** under your repository settings.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dark min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -83,7 +169,7 @@ export default function LoginScreen() {
               MathTracker
             </h1>
             <p className="text-slate-400 mt-2 text-sm md:text-base">
-              Your personal SSC Maths practice companion
+              Your personal SSC SSC Maths practice companion
             </p>
           </div>
 
