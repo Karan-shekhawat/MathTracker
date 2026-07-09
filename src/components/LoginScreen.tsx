@@ -19,7 +19,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="dark min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
