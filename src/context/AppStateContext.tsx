@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Topic, Subtopic, Concept, Question, MockTest, PracticeSession, ErrorBookItem, FailureReason, AppState, PastImport } from '../types';
-import { INITIAL_TOPICS, INITIAL_QUESTIONS } from '../seedData';
+import { saveFullState, loadFullState, deleteAllUserData } from '../lib/firestore';
 
 interface AppContextType {
   topics: Topic[];
@@ -48,38 +48,82 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export function AppStateProvider({ children }: { children: ReactNode }) {
+export function AppStateProvider({ children, userId }: { children: ReactNode; userId: string }) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [practiceSessions, setPracticeSessions] = useState<PracticeSession[]>([]);
   const [mockTests, setMockTests] = useState<MockTest[]>([]);
   const [errorBook, setErrorBook] = useState<ErrorBookItem[]>([]);
   const [pastImports, setPastImports] = useState<PastImport[]>([]);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark'); // Default dark mode as requested
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isInitialized, setIsInitialized] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load from LocalStorage
+  // Load from Firestore (with localStorage migration on first login)
   useEffect(() => {
-    const saved = localStorage.getItem('anki_ssc_maths_state_v5_clean');
-    if (saved) {
+    const loadData = async () => {
       try {
-        const parsed = JSON.parse(saved) as AppState;
-        setTopics(parsed.topics || []);
-        setQuestions(parsed.questions || []);
-        setPracticeSessions(parsed.practiceSessions || []);
-        setMockTests(parsed.mockTests || []);
-        setErrorBook(parsed.errorBook || []);
-        setPastImports(parsed.pastImports || []);
-        setTheme(parsed.theme || 'dark');
-      } catch (e) {
-        console.error('Failed to parse saved state', e);
-        initializeDefaultState();
+        // Try loading from Firestore first
+        const cloudState = await loadFullState(userId);
+
+        if (cloudState) {
+          // Cloud data exists — use it
+          setTopics(cloudState.topics || []);
+          setQuestions(cloudState.questions || []);
+          setPracticeSessions(cloudState.practiceSessions || []);
+          setMockTests(cloudState.mockTests || []);
+          setErrorBook(cloudState.errorBook || []);
+          setPastImports(cloudState.pastImports || []);
+          setTheme(cloudState.theme || 'dark');
+        } else {
+          // No cloud data — check for localStorage migration
+          const saved = localStorage.getItem('anki_ssc_maths_state_v5_clean');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved) as AppState;
+              setTopics(parsed.topics || []);
+              setQuestions(parsed.questions || []);
+              setPracticeSessions(parsed.practiceSessions || []);
+              setMockTests(parsed.mockTests || []);
+              setErrorBook(parsed.errorBook || []);
+              setPastImports(parsed.pastImports || []);
+              setTheme(parsed.theme || 'dark');
+              // Migrate to cloud
+              await saveFullState(userId, parsed);
+              console.log('✅ Migrated localStorage data to Firestore');
+            } catch (e) {
+              console.error('Failed to parse saved state', e);
+              initializeDefaultState();
+            }
+          } else {
+            initializeDefaultState();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load from Firestore, falling back to localStorage', error);
+        // Fallback to localStorage if Firestore fails
+        const saved = localStorage.getItem('anki_ssc_maths_state_v5_clean');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved) as AppState;
+            setTopics(parsed.topics || []);
+            setQuestions(parsed.questions || []);
+            setPracticeSessions(parsed.practiceSessions || []);
+            setMockTests(parsed.mockTests || []);
+            setErrorBook(parsed.errorBook || []);
+            setPastImports(parsed.pastImports || []);
+            setTheme(parsed.theme || 'dark');
+          } catch (e) {
+            initializeDefaultState();
+          }
+        } else {
+          initializeDefaultState();
+        }
       }
-    } else {
-      initializeDefaultState();
-    }
-    setIsInitialized(true);
-  }, []);
+      setIsInitialized(true);
+    };
+    loadData();
+  }, [userId]);
 
   const initializeDefaultState = () => {
     setTopics([]);
@@ -91,7 +135,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setErrorBook([]);
   };
 
-  // Save to LocalStorage whenever state changes
+  // Debounced save to Firestore whenever state changes
   useEffect(() => {
     if (isInitialized) {
       const state: AppState = {
@@ -103,9 +147,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         theme,
         pastImports
       };
+      // Also keep localStorage as a fast local cache
       localStorage.setItem('anki_ssc_maths_state_v5_clean', JSON.stringify(state));
+
+      // Debounce Firestore writes to avoid excessive writes
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveFullState(userId, state).catch(err =>
+          console.error('Failed to save to Firestore:', err)
+        );
+      }, 1500);
     }
-  }, [topics, questions, practiceSessions, mockTests, errorBook, theme, pastImports, isInitialized]);
+  }, [topics, questions, practiceSessions, mockTests, errorBook, theme, pastImports, isInitialized, userId]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -991,6 +1046,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const resetAllData = () => {
     localStorage.removeItem('anki_ssc_maths_state_v5_clean');
+    deleteAllUserData(userId).catch(err =>
+      console.error('Failed to delete Firestore data:', err)
+    );
     initializeDefaultState();
   };
 

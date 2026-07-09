@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppStateProvider } from './context/AppStateContext';
+import LoginScreen from './components/LoginScreen';
 import Sidebar from './components/Sidebar';
 import DashboardView from './components/DashboardView';
 import SyllabusView from './components/SyllabusView';
@@ -11,12 +13,30 @@ import AnalyticsView from './components/AnalyticsView';
 
 type ViewType = 'dashboard' | 'syllabus' | 'import' | 'practice' | 'mocks' | 'errorbook' | 'analytics';
 
-export default function App() {
+function AppContent() {
+  const { user, loading, signOut } = useAuth();
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
   // Concept ID selected from outside (e.g. syllabus screen) to pass into practice or search
   const [selectedConceptOverrideId, setSelectedConceptOverrideId] = useState<string | null>(null);
+
+  // Show loading spinner while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   const handleStartPracticeConcept = (conceptId: string) => {
     setSelectedConceptOverrideId(conceptId);
@@ -79,7 +99,7 @@ export default function App() {
   };
 
   return (
-    <AppStateProvider>
+    <AppStateProvider userId={user.uid}>
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row antialiased font-sans transition-colors duration-300">
         {/* Navigation Sidebar Drawer (Hidden during active Practice sessions) */}
         {currentView !== 'practice' && (
@@ -99,5 +119,13 @@ export default function App() {
         </main>
       </div>
     </AppStateProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
