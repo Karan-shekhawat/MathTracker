@@ -21,6 +21,12 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "types": []
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "index.html"
+  ]
 }
