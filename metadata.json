@@ -1,0 +1,6 @@
+{
+  "name": "Anki-Style SSC Maths Practice",
+  "description": "A comprehensive Anki-inspired practice tool for SSC mathematics, featuring structured syllabus tracking, Markdown package importing, a custom practice engine with SRS-based suggestions, a mock test tracker, error book logging, and detailed analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

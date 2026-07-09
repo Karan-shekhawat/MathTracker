@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Elegant Light Mode Colors */
+  --slate-950-color: #f8fafc; /* Slate 50 as main body background */
+  --slate-900-color: #ffffff; /* White as main cards */
+  --slate-850-color: #f1f5f9; /* Slate 100 for sub-cards / inputs */
+  --slate-800-color: rgba(15, 23, 42, 0.05); /* subtle borders */
+  --slate-750-color: rgba(15, 23, 42, 0.08);
+  --slate-700-color: rgba(15, 23, 42, 0.12);
+  --slate-600-color: rgba(15, 23, 42, 0.18);
+
+  --slate-100-color: #0f172a; /* text-slate-100 */
+  --slate-200-color: #1e293b; /* text-slate-200 */
+  --slate-300-color: #334155; /* text-slate-300 */
+  --slate-400-color: #64748b; /* text-slate-Muted */
+  --slate-500-color: #94a3b8; /* text-slate-Secondary */
+}
+
+.dark {
+  /* Elegant Dark Mode Colors */
+  --slate-950-color: #0a0a0a;
+  --slate-900-color: #111111;
+  --slate-850-color: #181818;
+  --slate-800-color: rgba(255, 255, 255, 0.05);
+  --slate-750-color: rgba(255, 255, 255, 0.08);
+  --slate-700-color: rgba(255, 255, 255, 0.1);
+  --slate-600-color: rgba(255, 255, 255, 0.15);
+
+  --slate-100-color: #f1f5f9;
+  --slate-200-color: #e2e8f0;
+  --slate-300-color: #cbd5e1;
+  --slate-400-color: #94a3b8;
+  --slate-500-color: #64748b;
+}
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Dynamically mapped slate backgrounds */
+  --color-slate-950: var(--slate-950-color);
+  --color-slate-900: var(--slate-900-color);
+  --color-slate-850: var(--slate-850-color);
+  --color-slate-800: var(--slate-800-color);
+  --color-slate-750: var(--slate-750-color);
+  --color-slate-700: var(--slate-700-color);
+  --color-slate-600: var(--slate-600-color);
+
+  /* Dynamically mapped slate text/foregrounds */
+  --color-slate-100: var(--slate-100-color);
+  --color-slate-200: var(--slate-200-color);
+  --color-slate-300: var(--slate-300-color);
+  --color-slate-400: var(--slate-400-color);
+  --color-slate-500: var(--slate-500-color);
+}
+
+/* Custom styles for dark/light scrollbars and animations */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.45);
+}
+
+.math-font {
+  font-family: var(--font-display);
+  font-style: italic;
+}
+
