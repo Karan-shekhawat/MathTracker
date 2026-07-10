@@ -3,9 +3,11 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
-    base: '/MathTracker/',
+    // Use '/' in dev so the app loads at localhost:3000/ where OAuth redirects land.
+    // Use '/MathTracker/' only for production builds (GitHub Pages deployment).
+    base: command === 'serve' ? '/' : '/MathTracker/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
