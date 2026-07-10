@@ -99,7 +99,7 @@ function AppContent() {
   };
 
   return (
-    <AppStateProvider userId={user ? user.uid : 'guest'}>
+    <AppStateProvider userId={user ? user.id : 'guest'}>
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col md:flex-row antialiased font-sans transition-colors duration-300">
         {/* Navigation Sidebar Drawer (Hidden during active Practice sessions) */}
         {currentView !== 'practice' && (
