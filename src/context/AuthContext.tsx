@@ -7,6 +7,9 @@ interface AuthContextType {
   isGuest: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   continueAsGuest: () => void;
 }
@@ -72,6 +75,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithEmail = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase is not configured.');
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      console.error('Email sign-in error:', error);
+      throw error;
+    }
+  };
+
+  const signUpWithEmail = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase is not configured.');
+    }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin + (import.meta.env.BASE_URL || '/'),
+      },
+    });
+    if (error) {
+      console.error('Email sign-up error:', error);
+      throw error;
+    }
+    // If email confirmation is required, user won't be signed in yet
+    if (data?.user && !data.session) {
+      throw new Error('CHECK_EMAIL');
+    }
+  };
+
+  const signInWithMagicLink = async (email: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase is not configured.');
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + (import.meta.env.BASE_URL || '/'),
+      },
+    });
+    if (error) {
+      console.error('Magic link error:', error);
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     setIsGuest(false);
     localStorage.removeItem('math_tracker_guest_mode');
@@ -89,7 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isGuest, loading, signInWithGoogle, signOut, continueAsGuest }}>
+    <AuthContext.Provider value={{
+      user, isGuest, loading,
+      signInWithGoogle, signInWithEmail, signUpWithEmail, signInWithMagicLink,
+      signOut, continueAsGuest,
+    }}>
       {children}
     </AuthContext.Provider>
   );
