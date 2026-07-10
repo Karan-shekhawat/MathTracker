@@ -29,7 +29,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Get initial session
+    // Set up the auth state listener FIRST so it catches the hash fragment
+    // token from Google OAuth redirect before getSession runs.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: string, session: Session | null) => {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          if (session?.user) {
+            setUser(session.user);
+            setIsGuest(false);
+            localStorage.removeItem('math_tracker_guest_mode');
+          }
+        }
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+
+        // Clean up the URL hash fragment left by OAuth redirect
+        // (removes #access_token=...&refresh_token=... from the address bar)
+        if (event === 'SIGNED_IN' && window.location.hash) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    // Get initial session as a fallback (e.g. page refresh with existing session)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -41,20 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to get session:', err);
       setLoading(false);
     });
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: string, session: Session | null) => {
-        if (session?.user) {
-          setUser(session.user);
-          setIsGuest(false);
-          localStorage.removeItem('math_tracker_guest_mode');
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
-      }
-    );
 
     return () => subscription.unsubscribe();
   }, []);
