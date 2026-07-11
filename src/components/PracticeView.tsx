@@ -20,6 +20,7 @@ import {
   Play,
   LogOut
 } from 'lucide-react';
+import MathText from './MathText';
 
 interface PracticeViewProps {
   initialConceptOverrideId?: string | null;
@@ -563,9 +564,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
               </div>
 
               {/* Question statements */}
-              <p className="text-sm md:text-base font-display font-medium text-slate-100 leading-relaxed leading-normal select-text">
-                {sessionQuestions[currentIdx].text}
-              </p>
+              <div className="text-sm md:text-base font-display font-medium text-slate-100 leading-relaxed leading-normal select-text">
+                <MathText content={sessionQuestions[currentIdx].text} />
+              </div>
 
               {/* Multiple Choice interactive buttons */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -588,7 +589,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
                       }`}>
                         {String.fromCharCode(65 + optIdx)}
                       </div>
-                      <span>{opt}</span>
+                      <div className="flex-1">
+                        <MathText content={opt} />
+                      </div>
                     </button>
                   );
                 })}
@@ -709,9 +712,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
                     </div>
 
                     {/* Question text */}
-                    <p className="text-xs md:text-sm text-slate-200 leading-normal leading-relaxed select-text font-medium">
-                      {q.text}
-                    </p>
+                    <div className="text-xs md:text-sm text-slate-200 leading-normal leading-relaxed select-text font-medium">
+                      <MathText content={q.text} />
+                    </div>
 
                     {/* Options summary */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -730,7 +733,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
                             }`}
                           >
                             <span className="font-mono font-bold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
-                            <span>{opt}</span>
+                            <div className="flex-1">
+                              <MathText content={opt} />
+                            </div>
                             {isUserAnswer && (
                               <span className={`text-[9px] font-mono ml-2 italic ${isCorrectOpt ? 'text-emerald-400 font-bold' : 'text-rose-400'}`}>
                                 (Your Choice)
@@ -749,9 +754,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
                     {/* Full proof solution block */}
                     <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-900 space-y-1">
                       <span className="text-[10px] font-mono text-slate-500 uppercase">Correct Solution Steps</span>
-                      <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-line select-text pt-1">
-                        {q.explanation || 'No step-by-step solution proof available.'}
-                      </p>
+                      <div className="text-xs text-slate-300 leading-relaxed font-mono select-text pt-1">
+                        <MathText content={q.explanation || 'No step-by-step solution proof available.'} />
+                      </div>
                     </div>
 
                     {/* INTERACTIVE FAILURE LOGS (Only for incorrect answers) */}

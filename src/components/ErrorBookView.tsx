@@ -26,8 +26,10 @@ import {
   AlertOctagon,
   Flame,
   CheckCircle,
-  Lightbulb
+  Lightbulb,
+  ExternalLink
 } from 'lucide-react';
+import MathText from './MathText';
 
 export default function ErrorBookView() {
   const {
@@ -559,9 +561,9 @@ export default function ErrorBookView() {
                   ) : (
                     <div className="space-y-2">
                       {(activeConcept.conceptExplanation || activeConcept.description) ? (
-                        <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
-                          {activeConcept.conceptExplanation || activeConcept.description}
-                        </p>
+                        <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
+                          <MathText content={activeConcept.conceptExplanation || activeConcept.description || ''} />
+                        </div>
                       ) : (
                         <div 
                           onClick={() => setIsEditingExplanation(true)}
@@ -585,9 +587,9 @@ export default function ErrorBookView() {
                         Original Blueprint Question
                       </h4>
                     </div>
-                    <p className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-text">
-                      {activeConcept.originalQuestion}
-                    </p>
+                    <div className="text-xs text-slate-300 font-mono leading-relaxed select-text">
+                      <MathText content={activeConcept.originalQuestion} />
+                    </div>
                   </div>
                 )}
 
@@ -643,9 +645,9 @@ export default function ErrorBookView() {
                   ) : (
                     <div className="space-y-2">
                       {activeConcept.bestMethod ? (
-                        <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
-                          {activeConcept.bestMethod}
-                        </p>
+                        <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
+                          <MathText content={activeConcept.bestMethod} />
+                        </div>
                       ) : (
                         <div 
                           onClick={() => setIsEditingBestMethod(true)}
@@ -717,9 +719,9 @@ export default function ErrorBookView() {
                           {/* Original Wrong Question Text */}
                           <div className="space-y-1">
                             <span className="text-[9px] font-mono text-slate-500 uppercase block">Original Wrong Question</span>
-                            <p className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium select-text border-l-2 border-rose-500/50 pl-3">
-                              {item.questionText}
-                            </p>
+                            <div className="text-xs md:text-sm text-slate-200 leading-relaxed font-medium select-text border-l-2 border-rose-500/50 pl-3">
+                              <MathText content={item.questionText} />
+                            </div>
                           </div>
 
                           {/* Question Choices (if available) */}
@@ -737,7 +739,9 @@ export default function ErrorBookView() {
                                     }`}
                                   >
                                     <span className="font-mono font-bold mr-1">{String.fromCharCode(65 + optIdx)}.</span>
-                                    {opt}
+                                    <div className="flex-1">
+                                      <MathText content={opt} />
+                                    </div>
                                   </div>
                                 );
                               })}

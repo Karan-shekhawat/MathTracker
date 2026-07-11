@@ -17,6 +17,7 @@ import {
   History,
   BookOpen
 } from 'lucide-react';
+import MathText from './MathText';
 
 interface ImportPackageViewProps {
   onImportComplete: () => void;
@@ -656,12 +657,16 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                               {q.difficulty}
                                             </span>
                                           </div>
-                                          <p className="text-sm text-slate-200 font-medium">{q.text}</p>
+                                          <div className="text-sm text-slate-200 font-medium">
+                                            <MathText content={q.text} />
+                                          </div>
                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                                             {q.options.map((opt, i) => (
                                               <div key={i} className={`p-2 rounded-lg border text-xs ${i === q.correctOption ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
                                                 <span className="font-bold mr-2">{['A', 'B', 'C', 'D'][i]}.</span>
-                                                {opt}
+                                                <div className="flex-1">
+                                                  <MathText content={opt} />
+                                                </div>
                                               </div>
                                             ))}
                                           </div>
@@ -959,9 +964,9 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                             </span>
                             <span className="text-[9px] font-mono text-slate-500">Correct: Option {String.fromCharCode(65 + q.correctOption)}</span>
                           </div>
-                          <p className="text-xs text-slate-300 line-clamp-1 font-sans leading-relaxed">
-                            {q.text}
-                          </p>
+                          <div className="text-xs text-slate-300 line-clamp-1 font-sans leading-relaxed">
+                            <MathText content={q.text} />
+                          </div>
                         </div>
                         <ChevronDown size={15} className={`text-slate-400 transition-transform duration-200 mt-1 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
                       </div>
@@ -1078,11 +1083,11 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                           ) : (
                             /* IMMUTABLE REVIEW MODE */
                             <div className="space-y-4">
-                              <p className="text-xs text-slate-200 leading-relaxed select-text font-sans">
-                                {q.text}
-                              </p>
+                            <div className="text-xs text-slate-200 leading-relaxed select-text font-sans">
+                              <MathText content={q.text} />
+                            </div>
 
-                              {/* Options */}
+                            {/* Options */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {q.options.map((opt, optIdx) => {
                                   const isCorrect = optIdx === q.correctOption;
@@ -1096,7 +1101,9 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                       }`}
                                     >
                                       <span className="font-mono font-bold mr-2 text-indigo-400">{String.fromCharCode(65 + optIdx)}.</span>
-                                      {opt}
+                                      <div className="flex-1">
+                                        <MathText content={opt} />
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -1106,9 +1113,9 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                               {q.explanation && (
                                 <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-850">
                                   <span className="text-[10px] font-mono text-slate-500 uppercase">Solution logic:</span>
-                                  <p className="text-xs text-slate-300 mt-1 leading-relaxed font-mono whitespace-pre-line select-text font-sans">
-                                    {q.explanation}
-                                  </p>
+                                  <div className="text-xs text-slate-300 mt-1 leading-relaxed font-mono select-text font-sans">
+                                    <MathText content={q.explanation} />
+                                  </div>
                                 </div>
                               )}
 
