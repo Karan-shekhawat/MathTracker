@@ -23,6 +23,7 @@ interface AppContextType {
   confirmImport: (questions: Omit<Question, 'id' | 'srsState'>[], meta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; }) => void;
   trackConceptPerformance: (conceptId: string, isCorrect: boolean) => void;
   deletePastImport: (id: string) => void;
+  editPastImport: (id: string, newTopicName: string, newSubtopicName: string, newConceptName: string) => void;
   logMockTest: (mock: Omit<MockTest, 'id'>) => void;
   updateMockTest: (id: string, updates: Partial<MockTest>) => void;
   deleteMockTest: (id: string) => void;
@@ -632,6 +633,77 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
     setPastImports(prev => prev.filter(p => p.id !== importId));
   };
 
+  const editPastImport = (importId: string, newTopicName: string, newSubtopicName: string, newConceptName: string) => {
+    const itemIndex = pastImports.findIndex(p => p.id === importId);
+    if (itemIndex === -1) return;
+    const item = pastImports[itemIndex];
+
+    const targetQuestionId = item.questionIds[0];
+    const targetQuestion = questions.find(q => q.id === targetQuestionId);
+    if (!targetQuestion) return; 
+
+    const targetConceptId = targetQuestion.conceptId;
+    let conceptToMove: Concept | undefined;
+
+    let cleanedTopics = topics.map(t => {
+      return {
+        ...t,
+        subtopics: t.subtopics.map(st => {
+          const cIndex = st.concepts.findIndex(c => c.id === targetConceptId);
+          if (cIndex !== -1) {
+            conceptToMove = { ...st.concepts[cIndex] };
+            return { ...st, concepts: st.concepts.filter(c => c.id !== targetConceptId) };
+          }
+          return st;
+        }).filter(st => st.concepts.length > 0) 
+      };
+    }).filter(t => t.subtopics.length > 0); 
+
+    if (!conceptToMove) return;
+
+    conceptToMove.name = newConceptName;
+
+    let tIndex = cleanedTopics.findIndex(t => t.name.toLowerCase() === newTopicName.toLowerCase());
+    let topicId = tIndex !== -1 ? cleanedTopics[tIndex].id : `topic_${Date.now()}`;
+    
+    if (tIndex === -1) {
+      cleanedTopics.push({
+        id: topicId,
+        name: newTopicName,
+        subtopics: []
+      });
+      tIndex = cleanedTopics.length - 1;
+    }
+
+    let t = cleanedTopics[tIndex];
+    let stIndex = t.subtopics.findIndex(st => st.name.toLowerCase() === newSubtopicName.toLowerCase());
+    let subtopicId = stIndex !== -1 ? t.subtopics[stIndex].id : `subtopic_${Date.now()}`;
+
+    if (stIndex === -1) {
+      t.subtopics.push({
+        id: subtopicId,
+        topicId: topicId,
+        name: newSubtopicName,
+        concepts: []
+      });
+      stIndex = t.subtopics.length - 1;
+    }
+
+    conceptToMove.subtopicId = subtopicId;
+    t.subtopics[stIndex].concepts.push(conceptToMove);
+
+    setTopics(cleanedTopics);
+
+    const updatedImports = [...pastImports];
+    updatedImports[itemIndex] = {
+      ...item,
+      topicName: newTopicName,
+      subtopicName: newSubtopicName,
+      conceptName: newConceptName
+    };
+    setPastImports(updatedImports);
+  };
+
   // Helper to parse Markdown package.
   // The expected markdown format:
   // # Question
@@ -1170,6 +1242,7 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
         confirmImport,
         trackConceptPerformance,
         deletePastImport,
+        editPastImport,
         logMockTest,
         updateMockTest,
         deleteMockTest,
