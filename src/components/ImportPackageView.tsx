@@ -28,8 +28,17 @@ Topic: Trigonometry
 Subtopic: Applications of Trigonometry
 Concept: Heights and Distances
 
+#Original
+Concept Explanation: This explains how this type of question is generally solved. Angles of elevation and depression relate the height of an object to the distance from the observer using trigonometric ratios like tangent.
 Original Question: From a point on the ground, the angle of elevation of the top of a tower is 30°. After walking 20m towards the tower, the angle of elevation becomes 60°. Find the height of the tower.
+Options:
+A. 10 m
+B. 10√3 m
+C. 20 m
+D. 20√3 m
+Answer: B
 Difficulty: Medium (Original)
+Best Method to Solve: Use the formula h = d / (cotθ1 - cotθ2) where d is the distance walked. Here, h = 20 / (√3 - 1/√3) = 10√3 m.
 
 ## Generated Questions
 
@@ -140,6 +149,9 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
   const [parsedTopicName, setParsedTopicName] = useState('');
   const [parsedSubtopicName, setParsedSubtopicName] = useState('');
   const [parsedConceptName, setParsedConceptName] = useState('');
+  const [parsedOriginalExplanation, setParsedOriginalExplanation] = useState('');
+  const [parsedOriginalQuestion, setParsedOriginalQuestion] = useState('');
+  const [parsedBestMethod, setParsedBestMethod] = useState('');
 
   // Selected Concept ID destination (for fallback / preview purposes)
   const [targetConceptId, setTargetConceptId] = useState<string>(() => {
@@ -204,10 +216,16 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
         setParsedTopicName(res.parsedMeta.topic || '');
         setParsedSubtopicName(res.parsedMeta.subtopic || '');
         setParsedConceptName(res.parsedMeta.concept || '');
+        setParsedOriginalExplanation(res.parsedMeta.conceptExplanation || '');
+        setParsedOriginalQuestion(res.parsedMeta.originalQuestion || '');
+        setParsedBestMethod(res.parsedMeta.bestMethod || '');
       } else {
         setParsedTopicName('');
         setParsedSubtopicName('');
         setParsedConceptName('');
+        setParsedOriginalExplanation('');
+        setParsedOriginalQuestion('');
+        setParsedBestMethod('');
       }
     } else {
       setError(res.error || 'Parsing failed. Make sure your markdown matches the correct format.');
@@ -265,7 +283,10 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
     const meta = {
       topic: parsedTopicName.trim(),
       subtopic: parsedSubtopicName.trim() || 'General',
-      concept: parsedConceptName.trim()
+      concept: parsedConceptName.trim(),
+      conceptExplanation: parsedOriginalExplanation.trim(),
+      originalQuestion: parsedOriginalQuestion.trim(),
+      bestMethod: parsedBestMethod.trim()
     };
 
     confirmImport(previewQuestions, meta);

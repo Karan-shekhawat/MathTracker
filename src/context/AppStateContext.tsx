@@ -19,8 +19,9 @@ interface AppContextType {
   addQuestion: (question: Omit<Question, 'id' | 'srsState'>) => void;
   updateQuestion: (id: string, updates: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
-  importMarkdownPackage: (markdown: string, conceptId: string) => { success: boolean; count: number; error?: string; preview: Partial<Question>[]; parsedMeta?: { topic: string; subtopic: string; concept: string } };
-  confirmImport: (questions: Omit<Question, 'id' | 'srsState'>[], meta?: { topic: string; subtopic: string; concept: string }) => void;
+  importMarkdownPackage: (markdown: string, conceptId: string) => { success: boolean; count: number; error?: string; preview: Partial<Question>[]; parsedMeta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; } };
+  confirmImport: (questions: Omit<Question, 'id' | 'srsState'>[], meta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; }) => void;
+  trackConceptPerformance: (conceptId: string, isCorrect: boolean) => void;
   deletePastImport: (id: string) => void;
   logMockTest: (mock: Omit<MockTest, 'id'>) => void;
   updateMockTest: (id: string, updates: Partial<MockTest>) => void;
@@ -296,6 +297,25 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
     );
   };
 
+  const trackConceptPerformance = (conceptId: string, isCorrect: boolean) => {
+    setTopics(prev =>
+      prev.map(t => ({
+        ...t,
+        subtopics: t.subtopics.map(st => ({
+          ...st,
+          concepts: st.concepts.map(c => {
+            if (c.id === conceptId) {
+              const currentPerf = c.recentPerformance || [];
+              const newPerf = [isCorrect, ...currentPerf].slice(0, 5); // Keep last 5 attempts
+              return { ...c, recentPerformance: newPerf };
+            }
+            return c;
+          })
+        }))
+      }))
+    );
+  };
+
   const addQuestion = (qData: Omit<Question, 'id' | 'srsState'>) => {
     const newQ: Question = {
       ...qData,
@@ -364,7 +384,7 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
 
   const confirmImport = (
     importedQs: Omit<Question, 'id' | 'srsState'>[],
-    meta?: { topic: string; subtopic: string; concept: string }
+    meta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; }
   ) => {
     let finalConceptId = '';
 
@@ -409,7 +429,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: subtopicId,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               }]
@@ -429,7 +453,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: subtopicId,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               }]
@@ -446,7 +474,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: st.id,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               };
@@ -464,6 +496,9 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
               const c = st.concepts[cIndex];
               const updatedC = {
                 ...c,
+                conceptExplanation: meta.conceptExplanation || c.conceptExplanation,
+                originalQuestion: meta.originalQuestion || c.originalQuestion,
+                bestMethod: meta.bestMethod || c.bestMethod,
                 questionsCount: c.questionsCount + importedQs.length
               };
               const updatedSt = {
@@ -631,9 +666,25 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
       if (subtopicMatch) parsedSubtopicName = subtopicMatch[1].trim();
       if (conceptMatch) parsedConceptName = conceptMatch[1].trim();
 
+      let parsedOriginalExplanation = '';
+      let parsedOriginalQuestion = '';
+      let parsedBestMethod = '';
+
       const isNewFormat = !!(topicMatch || subtopicMatch || conceptMatch);
 
       if (isNewFormat) {
+        const originalMatch = markdown.match(/#Original\s*\n([\s\S]*?)(?=\n## Generated Questions|$)/i);
+        if (originalMatch) {
+          const originalBlock = originalMatch[1];
+          const expMatch = originalBlock.match(/Concept Explanation:\s*([\s\S]*?)(?=\nOriginal Question:|$)/i);
+          if (expMatch) parsedOriginalExplanation = expMatch[1].trim();
+
+          const oqFullMatch = originalBlock.match(/Original Question:\s*([\s\S]*?)(?=\nBest Method to Solve:|$)/i);
+          if (oqFullMatch) parsedOriginalQuestion = oqFullMatch[1].trim();
+
+          const bmMatch = originalBlock.match(/Best Method to Solve:\s*([\s\S]*?)$/i);
+          if (bmMatch) parsedBestMethod = bmMatch[1].trim();
+        }
         const difficulties: ('Easy' | 'Medium' | 'Hard')[] = ['Easy', 'Medium', 'Hard'];
 
         const extractSection = (text: string, header: string): string => {
@@ -773,7 +824,10 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
         parsedMeta: isNewFormat ? {
           topic: parsedTopicName,
           subtopic: parsedSubtopicName,
-          concept: parsedConceptName
+          concept: parsedConceptName,
+          conceptExplanation: parsedOriginalExplanation,
+          originalQuestion: parsedOriginalQuestion,
+          bestMethod: parsedBestMethod
         } : undefined
       };
 
@@ -1005,7 +1059,18 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
               if (conceptResults.length === 0) return c;
               const conceptCorrect = conceptResults.filter(r => r.isCorrect).length;
               const mastery = Math.round((conceptCorrect / conceptResults.length) * 100);
-              return { ...c, mastery };
+              
+              const currentSessionResultsForConcept = results.filter(res => {
+                  const q = questions.find(qu => qu.id === res.questionId);
+                  return q && q.conceptId === c.id;
+              });
+              
+              let newPerf = c.recentPerformance || [];
+              currentSessionResultsForConcept.forEach(res => {
+                newPerf = [res.isCorrect, ...newPerf].slice(0, 5);
+              });
+
+              return { ...c, mastery, recentPerformance: newPerf };
             }
             return c;
           })
@@ -1103,6 +1168,7 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
         deleteQuestion,
         importMarkdownPackage,
         confirmImport,
+        trackConceptPerformance,
         deletePastImport,
         logMockTest,
         updateMockTest,

@@ -831,17 +831,60 @@ export default function MockTestsView() {
     setIsEditingMock(false);
   };
 
+  // Sort all mocks chronologically to easily find the "previous" mock for any mock test
+  const chronologicalMocks = [...mockTests].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+  const getPercentileTrend = (mock: MockTest) => {
+    // Find the index of this mock in the chronological list of the same type
+    const sameTypeMocks = chronologicalMocks.filter(m => m.type === mock.type);
+    const index = sameTypeMocks.findIndex(m => m.id === mock.id);
+    if (index <= 0) return null; // No previous mock of the same type
+
+    const prevMock = sameTypeMocks[index - 1];
+    const currentPercentile = mock.percentile ?? mock.accuracy;
+    const prevPercentile = prevMock.percentile ?? prevMock.accuracy;
+
+    if (currentPercentile > prevPercentile) return 'up';
+    if (currentPercentile < prevPercentile) return 'down';
+    return 'flat';
+  };
+
+  const renderTrendIcon = (mock: MockTest) => {
+    const trend = getPercentileTrend(mock);
+    if (trend === 'up') {
+      return (
+        <span className="inline-flex items-center text-emerald-500 shrink-0" title="Improved from previous mock">
+          <svg className="w-3 h-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7 7 7M12 3v18" />
+          </svg>
+        </span>
+      );
+    }
+    if (trend === 'down') {
+      return (
+        <span className="inline-flex items-center text-rose-500 shrink-0" title="Scored lower than previous mock">
+          <svg className="w-3 h-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7-7-7M12 21V3" />
+          </svg>
+        </span>
+      );
+    }
+    return null;
+  };
+
   // Categorize mock results
   const sectionalMocks = mockTests.filter(m => m.type === 'sectional');
   const fullMocks = mockTests.filter(m => m.type === 'full');
   const pypMocks = mockTests.filter(m => m.type === 'pyp');
   const liveMocks = mockTests.filter(m => m.type === 'live');
 
-  // Filter listings
-  const filteredMocks = mockTests.filter(m => {
-    if (filterType === 'all') return true;
-    return m.type === filterType;
-  });
+  // Filter listings and sort latest first
+  const filteredMocks = mockTests
+    .filter(m => {
+      if (filterType === 'all') return true;
+      return m.type === filterType;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
 
   // Calculate Averages
   const avgSectionalScore = sectionalMocks.length > 0
@@ -1183,8 +1226,9 @@ export default function MockTestsView() {
                            mock.type === 'pyp' ? '📚 PYP Mock' :
                            mock.type === 'live' ? '⚡ Live Mock' : '📝 Full Mock'}
                         </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-950 text-slate-300 text-[10px] font-mono font-bold border border-slate-800">
-                          {percentileVal}%ile
+                        <span className="px-1.5 py-0.5 rounded bg-slate-950 text-slate-300 text-[10px] font-mono font-bold border border-slate-800 flex items-center gap-1">
+                          <span>{percentileVal}%ile</span>
+                          {renderTrendIcon(mock)}
                         </span>
                       </div>
                     </div>
@@ -1269,8 +1313,9 @@ export default function MockTestsView() {
                     <div className="col-span-1 text-center font-mono text-slate-300">
                       {correctWrongStr}
                     </div>
-                    <div className="col-span-1 text-center font-mono font-bold text-emerald-400">
-                      {percentileVal}%ile
+                    <div className="col-span-1 text-center font-mono font-bold text-emerald-400 flex items-center justify-center gap-1">
+                      <span>{percentileVal}%ile</span>
+                      {renderTrendIcon(mock)}
                     </div>
                     <div className="col-span-1 text-right text-indigo-400 font-mono font-semibold">
                       Manage →
@@ -1305,7 +1350,10 @@ export default function MockTestsView() {
                       <span className="text-slate-500">•</span>
                       <span className="text-slate-300">C/W: {correctWrongStr}</span>
                       <span className="text-slate-500">•</span>
-                      <span className="text-emerald-400">{percentileVal}%ile</span>
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <span>{percentileVal}%ile</span>
+                        {renderTrendIcon(mock)}
+                      </span>
                     </div>
                     
                     <div className="text-right text-indigo-400 font-mono font-semibold text-[10px] mt-1">

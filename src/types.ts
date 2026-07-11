@@ -35,6 +35,10 @@ export interface Concept {
   subtopicId: string;
   name: string;
   description?: string;
+  conceptExplanation?: string;
+  originalQuestion?: string;
+  bestMethod?: string;
+  recentPerformance?: boolean[];
   mastery: number; // 0 to 100
   questionsCount: number;
 }

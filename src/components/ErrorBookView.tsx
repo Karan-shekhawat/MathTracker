@@ -49,6 +49,10 @@ export default function ErrorBookView() {
   // Editable concept description / explanation notes
   const [explanationText, setExplanationText] = useState('');
   const [isEditingExplanation, setIsEditingExplanation] = useState(false);
+  
+  // Editable Best Method
+  const [bestMethodText, setBestMethodText] = useState('');
+  const [isEditingBestMethod, setIsEditingBestMethod] = useState(false);
 
   // State to track drag hover effects for files on specific error book items
   const [dragActiveItemId, setDragActiveItemId] = useState<string | null>(null);
@@ -146,16 +150,26 @@ export default function ErrorBookView() {
   const handleOpenDoubtsDesk = (concept: Concept) => {
     setActiveConceptId(concept.id);
     setActiveConcept(concept);
-    setExplanationText(concept.description || '');
+    setExplanationText(concept.conceptExplanation || concept.description || '');
+    setBestMethodText(concept.bestMethod || '');
     setIsEditingExplanation(false);
+    setIsEditingBestMethod(false);
     setEditingItemId(null);
   };
 
   const handleSaveExplanation = (conceptId: string) => {
-    updateConcept(conceptId, { description: explanationText });
+    updateConcept(conceptId, { conceptExplanation: explanationText });
     setIsEditingExplanation(false);
     if (activeConcept) {
-      setActiveConcept({ ...activeConcept, description: explanationText });
+      setActiveConcept({ ...activeConcept, conceptExplanation: explanationText });
+    }
+  };
+
+  const handleSaveBestMethod = (conceptId: string) => {
+    updateConcept(conceptId, { bestMethod: bestMethodText });
+    setIsEditingBestMethod(false);
+    if (activeConcept) {
+      setActiveConcept({ ...activeConcept, bestMethod: bestMethodText });
     }
   };
 
@@ -185,10 +199,12 @@ export default function ErrorBookView() {
     const matchingSubtopics = t.subtopics.map(st => {
       const matchingConcepts = st.concepts.filter(c => {
         const hasActiveError = errorConceptIds.includes(c.id);
+        const hasOriginal = !!c.originalQuestion;
         const matchesSearch = searchQuery === '' || 
           c.name.toLowerCase().includes(query) || 
-          (c.description || '').toLowerCase().includes(query);
-        return hasActiveError && matchesSearch;
+          (c.description || '').toLowerCase().includes(query) ||
+          (c.originalQuestion || '').toLowerCase().includes(query);
+        return (hasActiveError || hasOriginal) && matchesSearch;
       });
       if (matchingConcepts.length > 0) {
         return {
@@ -387,7 +403,7 @@ export default function ErrorBookView() {
                             {st.name}
                           </h4>
                           <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                            ({st.concepts.length} concepts with errors)
+                            ({st.concepts.length} concepts logged)
                           </span>
                         </div>
 
@@ -411,8 +427,20 @@ export default function ErrorBookView() {
                                   </p>
                                 </div>
 
-                                {/* Center: Active Errors Indicator badge */}
-                                <div className="flex items-center gap-4 shrink-0">
+                                {/* Center: Performance & Error Density */}
+                                <div className="flex items-center gap-6 shrink-0">
+                                  {c.recentPerformance && c.recentPerformance.length > 0 && (
+                                    <div className="hidden sm:block text-right">
+                                      <span className="text-[9px] font-mono text-slate-500 block uppercase mb-1">Recent Trend</span>
+                                      <div className="flex gap-1 justify-end">
+                                        {[...c.recentPerformance].reverse().map((isCorrect, i) => (
+                                          <div key={i} className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold border ${isCorrect ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                            {isCorrect ? '✓' : '×'}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                   <div className="text-left sm:text-right min-w-[90px]">
                                     <span className="text-[9px] font-mono text-slate-500 block uppercase">Error Density</span>
                                     <span className="px-2 py-0.5 rounded-lg border bg-rose-500/10 border-rose-500/20 text-[10px] font-mono font-bold text-rose-400 inline-block mt-0.5">
@@ -476,73 +504,161 @@ export default function ErrorBookView() {
             {/* Modal Scrollable Body */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
               
-              {/* Section A: Concept Revision Notes & Explanations */}
-              <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-indigo-400">
-                    <BookOpen size={18} />
-                    <h4 className="font-display font-bold text-xs md:text-sm text-slate-200">
-                      Concept Revision Notes & Detailed Explanation
-                    </h4>
+              {/* Section A: Master Concept Template */}
+              <div className="space-y-6">
+                
+                {/* A1. Concept Revision Notes & Explanations */}
+                <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-indigo-400">
+                      <BookOpen size={18} />
+                      <h4 className="font-display font-bold text-xs md:text-sm text-slate-200">
+                        Concept Revision Notes & Detailed Explanation
+                      </h4>
+                    </div>
+
+                    {!isEditingExplanation ? (
+                      <button
+                        onClick={() => setIsEditingExplanation(true)}
+                        className="px-2.5 py-1 text-[10px] font-mono font-bold bg-slate-900 hover:bg-slate-850 text-indigo-400 border border-slate-800 hover:text-white rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit size={10} />
+                        Edit Notes
+                      </button>
+                    ) : null}
                   </div>
 
-                  {!isEditingExplanation ? (
-                    <button
-                      onClick={() => setIsEditingExplanation(true)}
-                      className="px-2.5 py-1 text-[10px] font-mono font-bold bg-slate-900 hover:bg-slate-850 text-indigo-400 border border-slate-800 hover:text-white rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                    >
-                      <Edit size={10} />
-                      Edit Notes
-                    </button>
-                  ) : null}
+                  {isEditingExplanation ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={explanationText}
+                        onChange={(e) => setExplanationText(e.target.value)}
+                        rows={4}
+                        placeholder="Write down the detailed explanations, theorems, memory tools, or solving rules for this concept..."
+                        className="w-full bg-slate-950 border border-slate-850 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setExplanationText(activeConcept.conceptExplanation || activeConcept.description || '');
+                            setIsEditingExplanation(false);
+                          }}
+                          className="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleSaveExplanation(activeConcept.id)}
+                          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md shadow-indigo-600/10 cursor-pointer"
+                        >
+                          <Save size={12} />
+                          Save Revision Sheet
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {(activeConcept.conceptExplanation || activeConcept.description) ? (
+                        <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
+                          {activeConcept.conceptExplanation || activeConcept.description}
+                        </p>
+                      ) : (
+                        <div 
+                          onClick={() => setIsEditingExplanation(true)}
+                          className="py-6 text-center border border-dashed border-slate-850 rounded-xl hover:border-indigo-500/50 cursor-pointer bg-slate-950/20 group transition-all"
+                        >
+                          <Lightbulb size={24} className="text-slate-600 group-hover:text-indigo-400 mx-auto mb-1.5 transition-colors" />
+                          <p className="text-[11px] text-slate-400 font-mono font-medium">No study notes recorded for this concept yet.</p>
+                          <p className="text-[9px] text-slate-500 font-mono mt-0.5">Click here to start editing custom cheat sheets</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {isEditingExplanation ? (
-                  <div className="space-y-3">
-                    <textarea
-                      value={explanationText}
-                      onChange={(e) => setExplanationText(e.target.value)}
-                      rows={4}
-                      placeholder="Write down the detailed explanations, theorems, memory tools, or solving rules for this concept..."
-                      className="w-full bg-slate-950 border border-slate-850 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono leading-relaxed"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setExplanationText(activeConcept.description || '');
-                          setIsEditingExplanation(false);
-                        }}
-                        className="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSaveExplanation(activeConcept.id)}
-                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md shadow-indigo-600/10 cursor-pointer"
-                      >
-                        <Save size={12} />
-                        Save Revision Sheet
-                      </button>
+                {/* A2. Original Question (if available) */}
+                {activeConcept.originalQuestion && (
+                  <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 text-indigo-400 border-b border-indigo-900/30 pb-2">
+                      <CheckCircle2 size={18} />
+                      <h4 className="font-display font-bold text-xs md:text-sm text-indigo-300">
+                        Original Blueprint Question
+                      </h4>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {activeConcept.description ? (
-                      <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
-                        {activeConcept.description}
-                      </p>
-                    ) : (
-                      <div 
-                        onClick={() => setIsEditingExplanation(true)}
-                        className="py-6 text-center border border-dashed border-slate-850 rounded-xl hover:border-indigo-500/50 cursor-pointer bg-slate-950/20 group transition-all"
-                      >
-                        <Lightbulb size={24} className="text-slate-600 group-hover:text-indigo-400 mx-auto mb-1.5 transition-colors" />
-                        <p className="text-[11px] text-slate-400 font-mono font-medium">No study notes recorded for this concept yet.</p>
-                        <p className="text-[9px] text-slate-500 font-mono mt-0.5">Click here to start editing custom cheat sheets</p>
-                      </div>
-                    )}
+                    <p className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed select-text">
+                      {activeConcept.originalQuestion}
+                    </p>
                   </div>
                 )}
+
+                {/* A3. Best Method to Solve / Notes */}
+                <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                      <Sparkles size={18} />
+                      <h4 className="font-display font-bold text-xs md:text-sm text-slate-200">
+                        Best Method to Solve
+                      </h4>
+                    </div>
+                    
+                    {!isEditingBestMethod ? (
+                      <button
+                        onClick={() => setIsEditingBestMethod(true)}
+                        className="px-2.5 py-1 text-[10px] font-mono font-bold bg-slate-900 hover:bg-slate-850 text-emerald-400 border border-slate-800 hover:text-white rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit size={10} />
+                        Edit Method
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {isEditingBestMethod ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={bestMethodText}
+                        onChange={(e) => setBestMethodText(e.target.value)}
+                        rows={4}
+                        placeholder="Write down the optimal strategy to solve this specific type of question..."
+                        className="w-full bg-slate-950 border border-slate-850 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono leading-relaxed"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setBestMethodText(activeConcept.bestMethod || '');
+                            setIsEditingBestMethod(false);
+                          }}
+                          className="px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleSaveBestMethod(activeConcept.id)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-md shadow-emerald-600/10 cursor-pointer"
+                        >
+                          <Save size={12} />
+                          Save Best Method
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeConcept.bestMethod ? (
+                        <p className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap select-text">
+                          {activeConcept.bestMethod}
+                        </p>
+                      ) : (
+                        <div 
+                          onClick={() => setIsEditingBestMethod(true)}
+                          className="py-6 text-center border border-dashed border-slate-850 rounded-xl hover:border-emerald-500/50 cursor-pointer bg-slate-950/20 group transition-all"
+                        >
+                          <Sparkles size={24} className="text-slate-600 group-hover:text-emerald-400 mx-auto mb-1.5 transition-colors" />
+                          <p className="text-[11px] text-slate-400 font-mono font-medium">No best method recorded yet.</p>
+                          <p className="text-[9px] text-slate-500 font-mono mt-0.5">Click here to add the optimal strategy</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Section B: Logged Mistakes list */}
