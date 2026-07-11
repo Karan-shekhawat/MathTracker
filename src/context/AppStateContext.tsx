@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Topic, Subtopic, Concept, Question, MockTest, PracticeSession, ErrorBookItem, FailureReason, AppState, PastImport } from '../types';
 import { saveFullState, loadFullState, deleteAllUserData } from '../lib/supabaseDb';
-
+import { updateSrsAfterPractice } from '../lib/srsEngine';
 interface AppContextType {
   topics: Topic[];
   questions: Question[];
@@ -1047,44 +1047,10 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
 
     setPracticeSessions(prev => [newSession, ...prev]);
 
-    // Update SRS schedule for each question
-    setQuestions(prevQs =>
-      prevQs.map(q => {
-        const res = results.find(r => r.questionId === q.id);
-        if (!res) return q;
-
-        const srs = { ...q.srsState };
-        const isCorrect = res.isCorrect;
-
-        // Repetitions
-        if (isCorrect) {
-          srs.repetitions += 1;
-          // Interval calculations
-          if (srs.repetitions === 1) {
-            srs.interval = 1; // 1 day
-          } else if (srs.repetitions === 2) {
-            srs.interval = 3; // 3 days
-          } else {
-            srs.interval = Math.ceil(srs.interval * srs.ease);
-          }
-          // Adjust ease
-          srs.ease = Math.min(3.0, srs.ease + 0.15);
-        } else {
-          srs.repetitions = 0;
-          srs.interval = 1; // Review tomorrow
-          // Decrease ease for incorrect
-          srs.ease = Math.max(1.3, srs.ease - 0.2);
-        }
-
-        srs.lastReviewed = new Date().toISOString();
-        // Due Date = Now + interval * 24 hours
-        const dueDateObj = new Date();
-        dueDateObj.setDate(dueDateObj.getDate() + srs.interval);
-        srs.dueDate = dueDateObj.toISOString();
-
-        return { ...q, srsState: srs };
-      })
-    );
+    // Use the new SRS engine to recalculate mastery, intervals, and dates
+    const { updatedTopics, updatedQuestions } = updateSrsAfterPractice(results, questions, topics);
+    setTopics(updatedTopics);
+    setQuestions(updatedQuestions);
 
     // Automatically send wrong answers to error book if they aren't already there
     results.forEach(res => {
@@ -1109,45 +1075,6 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
           setErrorBook(prev => [errorBookItem, ...prev]);
         }
       }
-    });
-
-    // Recalculate concept masteries based on recent practice sessions
-    // Let's compute average accuracy of the last few results for that concept
-    setTopics(prevTopics => {
-      return prevTopics.map(t => ({
-        ...t,
-        subtopics: t.subtopics.map(st => ({
-          ...st,
-          concepts: st.concepts.map(c => {
-            if (conceptIds.includes(c.id)) {
-              // Find all session results for this concept
-              // We'll calculate a simple weighted average accuracy
-              const conceptResults = [...results, ...practiceSessions.flatMap(ps => ps.results)]
-                .filter(res => {
-                  const q = questions.find(qu => qu.id === res.questionId);
-                  return q && q.conceptId === c.id;
-                });
-
-              if (conceptResults.length === 0) return c;
-              const conceptCorrect = conceptResults.filter(r => r.isCorrect).length;
-              const mastery = Math.round((conceptCorrect / conceptResults.length) * 100);
-              
-              const currentSessionResultsForConcept = results.filter(res => {
-                  const q = questions.find(qu => qu.id === res.questionId);
-                  return q && q.conceptId === c.id;
-              });
-              
-              let newPerf = c.recentPerformance || [];
-              currentSessionResultsForConcept.forEach(res => {
-                newPerf = [res.isCorrect, ...newPerf].slice(0, 5);
-              });
-
-              return { ...c, mastery, recentPerformance: newPerf };
-            }
-            return c;
-          })
-        }))
-      }));
     });
 
     return newSession;

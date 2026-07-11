@@ -21,7 +21,7 @@ import {
   LogOut
 } from 'lucide-react';
 import MathText from './MathText';
-
+import { getNextPracticeSet } from '../lib/srsEngine';
 interface PracticeViewProps {
   initialConceptOverrideId?: string | null;
   onViewChange?: (view: any) => void;
@@ -46,6 +46,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
   // Active session parameters
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [visitedQuestions, setVisitedQuestions] = useState<Set<number>>(new Set([0]));
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number | null>>({}); // questionId -> selectedOptionIdx
   const [startTime, setStartTime] = useState<number>(0);
   
@@ -102,7 +103,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
 
   // Timer counter
   useEffect(() => {
-    if (sessionStage !== 'active' || isPaused || showExitConfirm) {
+    if (sessionStage !== 'active' || isPaused || showExitConfirm || secondsRemaining <= 0) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
@@ -111,7 +112,6 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
       setSecondsRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleAutoSubmit();
           return 0;
         }
         return prev - 1;
@@ -121,43 +121,63 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [sessionStage, sessionQuestions, isPaused, showExitConfirm]);
+  }, [sessionStage, isPaused, showExitConfirm, secondsRemaining]);
+
+  // Handle Auto-submit when time is up
+  useEffect(() => {
+    if (sessionStage === 'active' && secondsRemaining === 0) {
+      // Small timeout to allow the UI to paint the 00:00 timer before the alert blocks it
+      const timeoutId = setTimeout(() => {
+        handleAutoSubmit();
+      }, 10);
+      return () => clearTimeout(timeoutId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsRemaining, sessionStage]);
+
+  // Track visited questions
+  useEffect(() => {
+    if (sessionStage === 'active') {
+      setVisitedQuestions(prev => {
+        if (!prev.has(currentIdx)) {
+          const next = new Set(prev);
+          next.add(currentIdx);
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [currentIdx, sessionStage]);
 
   const startSession = () => {
-    let pool: Question[] = [];
+    let selected: Question[] = [];
 
     if (isSrsMode) {
-      // Smart SRS filter: Questions whose dueDate is in the past, or all questions sorted by SRS urgency
-      // Priority: (1) Due today or past, (2) lower repetitions, (3) medium/hard difficulty
-      const nowStr = new Date().toISOString();
-      const dueQuestions = questions.filter(q => q.srsState.dueDate <= nowStr);
-      
-      if (dueQuestions.length > 0) {
-        pool = dueQuestions;
-      } else {
-        // If nothing is strictly due, fetch the next review items sorted chronologically
-        pool = [...questions].sort((a, b) => a.srsState.dueDate.localeCompare(b.srsState.dueDate));
-      }
+      selected = getNextPracticeSet(topics, questions, 10);
     } else {
       // Custom concepts filter
       if (selectedConceptIds.length === 0) {
         alert('Please select at least one concept to practice.');
         return;
       }
-      pool = questions.filter(q => selectedConceptIds.includes(q.conceptId));
+      const pool = questions.filter(q => selectedConceptIds.includes(q.conceptId));
+      if (pool.length === 0) {
+        alert('Your library has no questions matching this request. Import a package of questions or build one manually first!');
+        return;
+      }
+      
+      const shuffled = [...pool].sort(() => 0.5 - Math.random());
+      selected = shuffled.slice(0, 10);
     }
 
-    if (pool.length === 0) {
+    if (selected.length === 0) {
       alert('Your library has no questions matching this request. Import a package of questions or build one manually first!');
       return;
     }
 
-    // Pick maximum 10 questions randomly from the selected pool to avoid repetitiveness
-    const shuffled = [...pool].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 10);
-
     setSessionQuestions(selected);
     setCurrentIdx(0);
+    setVisitedQuestions(new Set([0]));
     // Initialize blank answers map
     const initialAnswers: Record<string, number | null> = {};
     selected.forEach(q => { initialAnswers[q.id] = null; });
@@ -466,6 +486,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
 
       {/* ================================== STAGE 2: ACTIVE EXAM SCREEN ================================== */}
       {sessionStage === 'active' && sessionQuestions.length > 0 && (
+        <>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col min-h-[500px] justify-between relative">
           
           {/* Header Progress and Timer with Pause & Exit Controls */}
@@ -630,6 +651,38 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
           </div>
 
         </div>
+
+        {/* Question Palette */}
+        {!isPaused && sessionStage === 'active' && (
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-6 pb-4">
+            {sessionQuestions.map((q, idx) => {
+              const isCurrent = idx === currentIdx;
+              const isAnswered = selectedAnswers[q.id] !== null && selectedAnswers[q.id] !== undefined;
+              const isVisited = visitedQuestions.has(idx);
+              
+              let boxStyles = '';
+              if (isAnswered) {
+                boxStyles = 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400';
+              } else if (isVisited) {
+                boxStyles = 'bg-slate-700/50 border-slate-600 text-slate-300';
+              } else {
+                boxStyles = 'bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800';
+              }
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIdx(idx)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-mono font-bold border transition-all cursor-pointer ${boxStyles} ${isCurrent ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-900' : ''}`}
+                  title={`Question ${idx + 1}`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        </>
       )}
 
       {/* ================================== STAGE 3: POST-PRACTICE REVIEW ================================== */}
