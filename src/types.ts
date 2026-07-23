@@ -31,21 +31,6 @@ export interface Question {
   needsEdit?: boolean; // Flagged during practice review for editing later
 }
 
-export interface DifficultySrsState {
-  mastery: number; // 0 to 100
-  interval: number; // in days
-  ease: number; // ease factor, default 2.5
-  repetitions: number; // count of consecutive correct reviews
-  dueDate: string; // ISO date string
-  lastReviewed: string | null; // ISO date string
-}
-
-export interface ConceptSrsData {
-  Easy: DifficultySrsState;
-  Medium: DifficultySrsState;
-  Hard: DifficultySrsState;
-}
-
 export interface Concept {
   id: string;
   subtopicId: string;
@@ -55,9 +40,8 @@ export interface Concept {
   originalQuestion?: string;
   bestMethod?: string;
   recentPerformance?: boolean[];
-  mastery: number; // 0 to 100, overall mastery
+  mastery: number; // 0 to 100, single mastery score. +10 correct, -5 wrong. 30+ → Medium, 70+ → Hard
   questionsCount: number;
-  srsData?: ConceptSrsData;
 }
 
 export interface Subtopic {

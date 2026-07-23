@@ -1,7 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useAppState } from '../context/AppStateContext';
-import { Concept, Topic, ConceptSrsData } from '../types';
-import { initializeConceptSrsData } from '../lib/srsEngine';
+import { Concept, Topic } from '../types';
 import {
   ChevronDown,
   ChevronRight,
@@ -151,23 +150,9 @@ export default function SyllabusView({
   const totalConceptsCount = allConcepts.length;
   const totalQuestionsCount = questions.length;
 
-  // Per-difficulty global averages
-  const getAvgDifficultyMastery = (concepts: Concept[]) => {
-    if (concepts.length === 0) return { easy: 0, medium: 0, hard: 0 };
-    let eSum = 0, mSum = 0, hSum = 0;
-    concepts.forEach(c => {
-      const srs = c.srsData || initializeConceptSrsData();
-      eSum += srs.Easy.mastery;
-      mSum += srs.Medium.mastery;
-      hSum += srs.Hard.mastery;
-    });
-    return {
-      easy: Math.round(eSum / concepts.length),
-      medium: Math.round(mSum / concepts.length),
-      hard: Math.round(hSum / concepts.length)
-    };
-  };
-  const globalDiffMastery = getAvgDifficultyMastery(allConcepts);
+  const avgMastery = totalConceptsCount > 0
+    ? Math.round(allConcepts.reduce((sum, c) => sum + (c.mastery || 0), 0) / totalConceptsCount)
+    : 0;
 
   const allPracticeResults = practiceSessions.flatMap(ps => ps.results);
   const totalPracticedAnswers = allPracticeResults.length;
@@ -289,35 +274,19 @@ export default function SyllabusView({
 
       {/* 2. Bento Statistics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Difficulty Mastery Breakdown */}
-        <div className="bg-slate-900/60 border border-slate-800/85 p-4 rounded-2xl shadow-md">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
-              <Award size={18} />
-            </div>
-            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wide">Mastery by Difficulty</span>
+        {/* Card 1: Syllabus Mastery */}
+        <div className="bg-slate-900/60 border border-slate-800/85 p-4 rounded-2xl flex items-center gap-4 shadow-md">
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+            <Award size={24} />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-mono font-bold text-emerald-400 w-7 shrink-0">E</span>
-              <div className="flex-1 bg-slate-950 h-2 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${globalDiffMastery.easy}%` }}></div>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-emerald-400 w-8 text-right">{globalDiffMastery.easy}%</span>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wide block">Overall Mastery</span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-xl font-bold text-white font-display">{avgMastery}%</span>
+              <span className="text-[10px] font-mono text-indigo-400">syllabus coverage</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-mono font-bold text-amber-400 w-7 shrink-0">M</span>
-              <div className="flex-1 bg-slate-950 h-2 rounded-full overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${globalDiffMastery.medium}%` }}></div>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-amber-400 w-8 text-right">{globalDiffMastery.medium}%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] font-mono font-bold text-rose-400 w-7 shrink-0">H</span>
-              <div className="flex-1 bg-slate-950 h-2 rounded-full overflow-hidden">
-                <div className="bg-rose-500 h-full rounded-full transition-all" style={{ width: `${globalDiffMastery.hard}%` }}></div>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-rose-400 w-8 text-right">{globalDiffMastery.hard}%</span>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full mt-1.5 overflow-hidden">
+              <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${avgMastery}%` }}></div>
             </div>
           </div>
         </div>
@@ -418,7 +387,9 @@ export default function SyllabusView({
               return !!c;
             }).length;
             
-            const tDiffMastery = getAvgDifficultyMastery(tConcepts);
+            const tAvgMastery = tConceptsCount > 0
+              ? Math.round(tConcepts.reduce((sum, c) => sum + (c.mastery || 0), 0) / tConceptsCount)
+              : 0;
 
             return (
               <div
@@ -446,9 +417,7 @@ export default function SyllabusView({
                         <span>•</span>
                         <span>{tQuestionsCount} questions</span>
                         <span>•</span>
-                        <span className="text-emerald-400 font-semibold">E:{tDiffMastery.easy}%</span>
-                        <span className="text-amber-400 font-semibold">M:{tDiffMastery.medium}%</span>
-                        <span className="text-rose-400 font-semibold">H:{tDiffMastery.hard}%</span>
+                        <span className="text-indigo-400 font-semibold">{tAvgMastery}% average mastery</span>
                       </div>
                     </div>
                   </div>
@@ -576,17 +545,23 @@ export default function SyllabusView({
                                   const cStats = getConceptStats(c.id);
                                   const isHighlighted = highlightConceptId === c.id;
 
-                                  // Per-difficulty mastery from SRS data
-                                  const cSrs = c.srsData || initializeConceptSrsData();
-                                  const eMastery = cSrs.Easy.mastery;
-                                  const mMastery = cSrs.Medium.mastery;
-                                  const hMastery = cSrs.Hard.mastery;
+                                  const cMastery = c.mastery || 0;
 
-                                  // Determine which difficulty SRS will serve next
+                                  // Target SRS difficulty based on single mastery thresholds
                                   let nextDiff: 'Easy' | 'Medium' | 'Hard' = 'Easy';
-                                  if (eMastery >= 70) {
-                                    nextDiff = mMastery >= 70 ? 'Hard' : 'Medium';
+                                  if (cMastery >= 70) {
+                                    nextDiff = 'Hard';
+                                  } else if (cMastery >= 30) {
+                                    nextDiff = 'Medium';
                                   }
+
+                                  const isHigh = cMastery >= 70;
+                                  const isMed = cMastery >= 30 && cMastery < 70;
+                                  const masteryBadgeClass = isHigh
+                                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                    : isMed
+                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
 
                                   return (
                                     <div
@@ -619,34 +594,22 @@ export default function SyllabusView({
                                         </div>
                                       </div>
 
-                                      {/* Center block: Difficulty mastery bars and stats */}
+                                      {/* Center block: Single mastery bar and stats */}
                                       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 shrink-0">
                                         
-                                        {/* Per-Difficulty Mastery Visual */}
-                                        <div className="min-w-[130px]">
-                                          <span className="text-[9px] font-mono text-slate-500 block uppercase mb-1">Mastery</span>
-                                          <div className="space-y-1">
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-[8px] font-mono font-bold text-emerald-400 w-4">E</span>
-                                              <div className="w-14 bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${eMastery}%` }}></div>
-                                              </div>
-                                              <span className="text-[9px] font-mono font-bold text-emerald-400 w-7 text-right">{eMastery}%</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-[8px] font-mono font-bold text-amber-400 w-4">M</span>
-                                              <div className="w-14 bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${mMastery}%` }}></div>
-                                              </div>
-                                              <span className="text-[9px] font-mono font-bold text-amber-400 w-7 text-right">{mMastery}%</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="text-[8px] font-mono font-bold text-rose-400 w-4">H</span>
-                                              <div className="w-14 bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-rose-500 h-full rounded-full transition-all" style={{ width: `${hMastery}%` }}></div>
-                                              </div>
-                                              <span className="text-[9px] font-mono font-bold text-rose-400 w-7 text-right">{hMastery}%</span>
-                                            </div>
+                                        {/* Mastery Visual */}
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="text-right">
+                                            <span className="text-[9px] font-mono text-slate-500 block uppercase">Mastery</span>
+                                            <span className={`px-2 py-0.5 rounded-lg border text-xs font-mono font-bold inline-block mt-0.5 ${masteryBadgeClass}`}>
+                                              {cMastery}%
+                                            </span>
+                                          </div>
+                                          <div className="w-16 bg-slate-900 h-1.5 rounded-full overflow-hidden shrink-0 hidden sm:block">
+                                            <div
+                                              className={`h-full rounded-full ${isHigh ? 'bg-rose-500' : isMed ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                              style={{ width: `${cMastery}%` }}
+                                            ></div>
                                           </div>
                                         </div>
 
