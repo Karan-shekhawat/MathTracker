@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../context/AppStateContext';
-import { Question, Difficulty, FailureReason } from '../types';
+import { Question, FailureReason } from '../types';
 import {
   Brain,
   Timer,
@@ -122,89 +122,12 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
     };
   }, [sessionStage, sessionQuestions, isPaused, showExitConfirm]);
 
-  // ======================== ADAPTIVE DIFFICULTY PROGRESSION ========================
-  // Computes the target difficulty for a concept based on the user's historical accuracy.
-  // Progression: Easy → Medium (≥80% on ≥5 Easy attempts) → Hard (≥80% on ≥5 Medium attempts)
-  const MIN_ATTEMPTS_FOR_PROMOTION = 5;
-  const ACCURACY_THRESHOLD = 0.8; // 80%
-
-  const getConceptTargetDifficulty = (conceptId: string): Difficulty => {
-    // Collect all past practice results for questions belonging to this concept
-    const conceptQuestionIds = new Set(questions.filter(q => q.conceptId === conceptId).map(q => q.id));
-    // Build a map of questionId → difficulty for fast lookups
-    const questionDifficultyMap = new Map<string, Difficulty>();
-    questions.forEach(q => {
-      if (q.conceptId === conceptId) questionDifficultyMap.set(q.id, q.difficulty);
-    });
-
-    // Aggregate results per difficulty level
-    const stats: Record<Difficulty, { total: number; correct: number }> = {
-      'Easy': { total: 0, correct: 0 },
-      'Medium': { total: 0, correct: 0 },
-      'Hard': { total: 0, correct: 0 }
-    };
-
-    for (const session of practiceSessions) {
-      for (const result of session.results) {
-        if (!conceptQuestionIds.has(result.questionId)) continue;
-        const diff = questionDifficultyMap.get(result.questionId);
-        if (!diff) continue;
-        stats[diff].total += 1;
-        if (result.isCorrect) stats[diff].correct += 1;
-      }
-    }
-
-    // Determine target difficulty through progressive promotion
-    const easyAcc = stats['Easy'].total >= MIN_ATTEMPTS_FOR_PROMOTION
-      ? stats['Easy'].correct / stats['Easy'].total
-      : 0;
-    const mediumAcc = stats['Medium'].total >= MIN_ATTEMPTS_FOR_PROMOTION
-      ? stats['Medium'].correct / stats['Medium'].total
-      : 0;
-
-    if (easyAcc >= ACCURACY_THRESHOLD && mediumAcc >= ACCURACY_THRESHOLD) return 'Hard';
-    if (easyAcc >= ACCURACY_THRESHOLD) return 'Medium';
-    return 'Easy';
-  };
-
-  // Applies adaptive difficulty prioritization to a question pool.
-  // Questions at or above the target difficulty are placed first; lower-difficulty
-  // questions backfill remaining slots so the session always has enough questions.
-  const applyDifficultyPrioritization = (pool: Question[]): Question[] => {
-    // Gather all unique concept IDs from the pool
-    const conceptIds = [...new Set(pool.map(q => q.conceptId))];
-
-    // Compute target difficulty per concept
-    const conceptTargets = new Map<string, Difficulty>();
-    for (const cid of conceptIds) {
-      conceptTargets.set(cid, getConceptTargetDifficulty(cid));
-    }
-
-    const difficultyRank: Record<Difficulty, number> = { 'Easy': 0, 'Medium': 1, 'Hard': 2 };
-
-    // Partition into priority (at or above target) and backfill (below target)
-    const priority: Question[] = [];
-    const backfill: Question[] = [];
-
-    for (const q of pool) {
-      const target = conceptTargets.get(q.conceptId) || 'Easy';
-      if (difficultyRank[q.difficulty] >= difficultyRank[target]) {
-        priority.push(q);
-      } else {
-        backfill.push(q);
-      }
-    }
-
-    // Shuffle each group independently, then concatenate priority-first
-    const shuffleArr = (arr: Question[]) => [...arr].sort(() => 0.5 - Math.random());
-    return [...shuffleArr(priority), ...shuffleArr(backfill)];
-  };
-
   const startSession = () => {
     let pool: Question[] = [];
 
     if (isSrsMode) {
       // Smart SRS filter: Questions whose dueDate is in the past, or all questions sorted by SRS urgency
+      // Priority: (1) Due today or past, (2) lower repetitions, (3) medium/hard difficulty
       const nowStr = new Date().toISOString();
       const dueQuestions = questions.filter(q => q.srsState.dueDate <= nowStr);
       
@@ -228,9 +151,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
       return;
     }
 
-    // Apply adaptive difficulty prioritization, then pick top 10
-    const prioritized = applyDifficultyPrioritization(pool);
-    const selected = prioritized.slice(0, 10);
+    // Pick maximum 10 questions randomly from the selected pool to avoid repetitiveness
+    const shuffled = [...pool].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 10);
 
     setSessionQuestions(selected);
     setCurrentIdx(0);

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Topic, Subtopic, Concept, Question, MockTest, PracticeSession, ErrorBookItem, FailureReason, AppState, PastImport } from '../types';
 import { saveFullState, loadFullState, deleteAllUserData } from '../lib/supabaseDb';
-
+import { updateSrsAfterPractice } from '../lib/srsEngine';
 interface AppContextType {
   topics: Topic[];
   questions: Question[];
@@ -19,9 +19,11 @@ interface AppContextType {
   addQuestion: (question: Omit<Question, 'id' | 'srsState'>) => void;
   updateQuestion: (id: string, updates: Partial<Question>) => void;
   deleteQuestion: (id: string) => void;
-  importMarkdownPackage: (markdown: string, conceptId: string) => { success: boolean; count: number; error?: string; preview: Partial<Question>[]; parsedMeta?: { topic: string; subtopic: string; concept: string } };
-  confirmImport: (questions: Omit<Question, 'id' | 'srsState'>[], meta?: { topic: string; subtopic: string; concept: string }) => void;
+  importMarkdownPackage: (markdown: string, conceptId: string) => { success: boolean; count: number; error?: string; preview: Partial<Question>[]; parsedMeta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; } };
+  confirmImport: (questions: Omit<Question, 'id' | 'srsState'>[], meta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; }) => void;
+  trackConceptPerformance: (conceptId: string, isCorrect: boolean) => void;
   deletePastImport: (id: string) => void;
+  editPastImport: (id: string, newTopicName: string, newSubtopicName: string, newConceptName: string) => void;
   logMockTest: (mock: Omit<MockTest, 'id'>) => void;
   updateMockTest: (id: string, updates: Partial<MockTest>) => void;
   deleteMockTest: (id: string) => void;
@@ -296,6 +298,25 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
     );
   };
 
+  const trackConceptPerformance = (conceptId: string, isCorrect: boolean) => {
+    setTopics(prev =>
+      prev.map(t => ({
+        ...t,
+        subtopics: t.subtopics.map(st => ({
+          ...st,
+          concepts: st.concepts.map(c => {
+            if (c.id === conceptId) {
+              const currentPerf = c.recentPerformance || [];
+              const newPerf = [isCorrect, ...currentPerf].slice(0, 5); // Keep last 5 attempts
+              return { ...c, recentPerformance: newPerf };
+            }
+            return c;
+          })
+        }))
+      }))
+    );
+  };
+
   const addQuestion = (qData: Omit<Question, 'id' | 'srsState'>) => {
     const newQ: Question = {
       ...qData,
@@ -364,7 +385,7 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
 
   const confirmImport = (
     importedQs: Omit<Question, 'id' | 'srsState'>[],
-    meta?: { topic: string; subtopic: string; concept: string }
+    meta?: { topic: string; subtopic: string; concept: string; conceptExplanation?: string; originalQuestion?: string; bestMethod?: string; }
   ) => {
     let finalConceptId = '';
 
@@ -409,7 +430,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: subtopicId,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               }]
@@ -429,7 +454,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: subtopicId,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               }]
@@ -446,7 +475,11 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
                 id: finalConceptId,
                 subtopicId: st.id,
                 name: meta.concept,
-                description: `Imported questions for ${meta.concept}`,
+                description: meta.conceptExplanation || `Imported questions for ${meta.concept}`,
+                conceptExplanation: meta.conceptExplanation,
+                originalQuestion: meta.originalQuestion,
+                bestMethod: meta.bestMethod,
+                recentPerformance: [],
                 mastery: 0,
                 questionsCount: importedQs.length
               };
@@ -464,6 +497,9 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
               const c = st.concepts[cIndex];
               const updatedC = {
                 ...c,
+                conceptExplanation: meta.conceptExplanation || c.conceptExplanation,
+                originalQuestion: meta.originalQuestion || c.originalQuestion,
+                bestMethod: meta.bestMethod || c.bestMethod,
                 questionsCount: c.questionsCount + importedQs.length
               };
               const updatedSt = {
@@ -597,6 +633,77 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
     setPastImports(prev => prev.filter(p => p.id !== importId));
   };
 
+  const editPastImport = (importId: string, newTopicName: string, newSubtopicName: string, newConceptName: string) => {
+    const itemIndex = pastImports.findIndex(p => p.id === importId);
+    if (itemIndex === -1) return;
+    const item = pastImports[itemIndex];
+
+    const targetQuestionId = item.questionIds[0];
+    const targetQuestion = questions.find(q => q.id === targetQuestionId);
+    if (!targetQuestion) return; 
+
+    const targetConceptId = targetQuestion.conceptId;
+    let conceptToMove: Concept | undefined;
+
+    let cleanedTopics = topics.map(t => {
+      return {
+        ...t,
+        subtopics: t.subtopics.map(st => {
+          const cIndex = st.concepts.findIndex(c => c.id === targetConceptId);
+          if (cIndex !== -1) {
+            conceptToMove = { ...st.concepts[cIndex] };
+            return { ...st, concepts: st.concepts.filter(c => c.id !== targetConceptId) };
+          }
+          return st;
+        }).filter(st => st.concepts.length > 0) 
+      };
+    }).filter(t => t.subtopics.length > 0); 
+
+    if (!conceptToMove) return;
+
+    conceptToMove.name = newConceptName;
+
+    let tIndex = cleanedTopics.findIndex(t => t.name.toLowerCase() === newTopicName.toLowerCase());
+    let topicId = tIndex !== -1 ? cleanedTopics[tIndex].id : `topic_${Date.now()}`;
+    
+    if (tIndex === -1) {
+      cleanedTopics.push({
+        id: topicId,
+        name: newTopicName,
+        subtopics: []
+      });
+      tIndex = cleanedTopics.length - 1;
+    }
+
+    let t = cleanedTopics[tIndex];
+    let stIndex = t.subtopics.findIndex(st => st.name.toLowerCase() === newSubtopicName.toLowerCase());
+    let subtopicId = stIndex !== -1 ? t.subtopics[stIndex].id : `subtopic_${Date.now()}`;
+
+    if (stIndex === -1) {
+      t.subtopics.push({
+        id: subtopicId,
+        topicId: topicId,
+        name: newSubtopicName,
+        concepts: []
+      });
+      stIndex = t.subtopics.length - 1;
+    }
+
+    conceptToMove.subtopicId = subtopicId;
+    t.subtopics[stIndex].concepts.push(conceptToMove);
+
+    setTopics(cleanedTopics);
+
+    const updatedImports = [...pastImports];
+    updatedImports[itemIndex] = {
+      ...item,
+      topicName: newTopicName,
+      subtopicName: newSubtopicName,
+      conceptName: newConceptName
+    };
+    setPastImports(updatedImports);
+  };
+
   // Helper to parse Markdown package.
   // The expected markdown format:
   // # Question
@@ -631,9 +738,25 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
       if (subtopicMatch) parsedSubtopicName = subtopicMatch[1].trim();
       if (conceptMatch) parsedConceptName = conceptMatch[1].trim();
 
+      let parsedOriginalExplanation = '';
+      let parsedOriginalQuestion = '';
+      let parsedBestMethod = '';
+
       const isNewFormat = !!(topicMatch || subtopicMatch || conceptMatch);
 
       if (isNewFormat) {
+        const originalMatch = markdown.match(/#Original\s*\n([\s\S]*?)(?=\n## Generated Questions|$)/i);
+        if (originalMatch) {
+          const originalBlock = originalMatch[1];
+          const expMatch = originalBlock.match(/Concept Explanation:\s*([\s\S]*?)(?=\nOriginal Question:|$)/i);
+          if (expMatch) parsedOriginalExplanation = expMatch[1].trim();
+
+          const oqFullMatch = originalBlock.match(/Original Question:\s*([\s\S]*?)(?=\nBest Method to Solve:|$)/i);
+          if (oqFullMatch) parsedOriginalQuestion = oqFullMatch[1].trim();
+
+          const bmMatch = originalBlock.match(/Best Method to Solve:\s*([\s\S]*?)$/i);
+          if (bmMatch) parsedBestMethod = bmMatch[1].trim();
+        }
         const difficulties: ('Easy' | 'Medium' | 'Hard')[] = ['Easy', 'Medium', 'Hard'];
 
         const extractSection = (text: string, header: string): string => {
@@ -773,7 +896,10 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
         parsedMeta: isNewFormat ? {
           topic: parsedTopicName,
           subtopic: parsedSubtopicName,
-          concept: parsedConceptName
+          concept: parsedConceptName,
+          conceptExplanation: parsedOriginalExplanation,
+          originalQuestion: parsedOriginalQuestion,
+          bestMethod: parsedBestMethod
         } : undefined
       };
 
@@ -921,44 +1047,10 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
 
     setPracticeSessions(prev => [newSession, ...prev]);
 
-    // Update SRS schedule for each question
-    setQuestions(prevQs =>
-      prevQs.map(q => {
-        const res = results.find(r => r.questionId === q.id);
-        if (!res) return q;
-
-        const srs = { ...q.srsState };
-        const isCorrect = res.isCorrect;
-
-        // Repetitions
-        if (isCorrect) {
-          srs.repetitions += 1;
-          // Interval calculations
-          if (srs.repetitions === 1) {
-            srs.interval = 1; // 1 day
-          } else if (srs.repetitions === 2) {
-            srs.interval = 3; // 3 days
-          } else {
-            srs.interval = Math.ceil(srs.interval * srs.ease);
-          }
-          // Adjust ease
-          srs.ease = Math.min(3.0, srs.ease + 0.15);
-        } else {
-          srs.repetitions = 0;
-          srs.interval = 1; // Review tomorrow
-          // Decrease ease for incorrect
-          srs.ease = Math.max(1.3, srs.ease - 0.2);
-        }
-
-        srs.lastReviewed = new Date().toISOString();
-        // Due Date = Now + interval * 24 hours
-        const dueDateObj = new Date();
-        dueDateObj.setDate(dueDateObj.getDate() + srs.interval);
-        srs.dueDate = dueDateObj.toISOString();
-
-        return { ...q, srsState: srs };
-      })
-    );
+    // Use the new SRS engine to recalculate mastery, intervals, and dates
+    const { updatedTopics, updatedQuestions } = updateSrsAfterPractice(results, questions, topics);
+    setTopics(updatedTopics);
+    setQuestions(updatedQuestions);
 
     // Automatically send wrong answers to error book if they aren't already there
     results.forEach(res => {
@@ -983,34 +1075,6 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
           setErrorBook(prev => [errorBookItem, ...prev]);
         }
       }
-    });
-
-    // Recalculate concept masteries based on recent practice sessions
-    // Let's compute average accuracy of the last few results for that concept
-    setTopics(prevTopics => {
-      return prevTopics.map(t => ({
-        ...t,
-        subtopics: t.subtopics.map(st => ({
-          ...st,
-          concepts: st.concepts.map(c => {
-            if (conceptIds.includes(c.id)) {
-              // Find all session results for this concept
-              // We'll calculate a simple weighted average accuracy
-              const conceptResults = [...results, ...practiceSessions.flatMap(ps => ps.results)]
-                .filter(res => {
-                  const q = questions.find(qu => qu.id === res.questionId);
-                  return q && q.conceptId === c.id;
-                });
-
-              if (conceptResults.length === 0) return c;
-              const conceptCorrect = conceptResults.filter(r => r.isCorrect).length;
-              const mastery = Math.round((conceptCorrect / conceptResults.length) * 100);
-              return { ...c, mastery };
-            }
-            return c;
-          })
-        }))
-      }));
     });
 
     return newSession;
@@ -1103,7 +1167,9 @@ export function AppStateProvider({ children, userId }: { children: ReactNode; us
         deleteQuestion,
         importMarkdownPackage,
         confirmImport,
+        trackConceptPerformance,
         deletePastImport,
+        editPastImport,
         logMockTest,
         updateMockTest,
         deleteMockTest,

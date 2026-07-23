@@ -30,13 +30,33 @@ export interface Question {
   notes?: string;
 }
 
+export interface DifficultySrsState {
+  mastery: number; // 0 to 100
+  interval: number; // in days
+  ease: number; // ease factor, default 2.5
+  repetitions: number; // count of consecutive correct reviews
+  dueDate: string; // ISO date string
+  lastReviewed: string | null; // ISO date string
+}
+
+export interface ConceptSrsData {
+  Easy: DifficultySrsState;
+  Medium: DifficultySrsState;
+  Hard: DifficultySrsState;
+}
+
 export interface Concept {
   id: string;
   subtopicId: string;
   name: string;
   description?: string;
-  mastery: number; // 0 to 100
+  conceptExplanation?: string;
+  originalQuestion?: string;
+  bestMethod?: string;
+  recentPerformance?: boolean[];
+  mastery: number; // 0 to 100, overall mastery
   questionsCount: number;
+  srsData?: ConceptSrsData;
 }
 
 export interface Subtopic {

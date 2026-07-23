@@ -30,6 +30,7 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
     try { await signInWithGoogle(); }
     catch (err: any) { setError(err.message || 'Failed to sign in.'); }
     finally { setIsLoading(false); }
@@ -37,6 +38,7 @@ export default function LoginScreen() {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccess(null);
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setIsLoading(true);
     setError(null);
@@ -47,6 +49,7 @@ export default function LoginScreen() {
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccess(null);
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setIsLoading(true);
@@ -65,6 +68,7 @@ export default function LoginScreen() {
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSuccess(null);
     if (!email) { setError('Please enter your email.'); return; }
     setIsLoading(true);
     setError(null);
