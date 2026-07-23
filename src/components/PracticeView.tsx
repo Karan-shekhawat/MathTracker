@@ -53,7 +53,9 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
   const [secondsRemaining, setSecondsRemaining] = useState(600); // 10 minutes
   const [isPaused, setIsPaused] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [timeExpired, setTimeExpired] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const selectedAnswersRef = useRef(selectedAnswers);
 
   // Post Practice state
   const [sessionDurationSeconds, setSessionDurationSeconds] = useState(0);
@@ -100,6 +102,11 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [sessionStage, sessionQuestions, currentIdx, selectedAnswers]);
 
+  // Keep the ref in sync with the latest selectedAnswers
+  useEffect(() => {
+    selectedAnswersRef.current = selectedAnswers;
+  }, [selectedAnswers]);
+
   // Timer counter
   useEffect(() => {
     if (sessionStage !== 'active' || isPaused || showExitConfirm) {
@@ -111,7 +118,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
       setSecondsRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleAutoSubmit();
+          setTimeExpired(true);
           return 0;
         }
         return prev - 1;
@@ -122,6 +129,15 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [sessionStage, sessionQuestions, isPaused, showExitConfirm]);
+
+  // Auto-submit when time expires — uses a separate effect so it always reads
+  // the latest selectedAnswers (avoids the stale closure from the timer callback)
+  useEffect(() => {
+    if (timeExpired && sessionStage === 'active') {
+      setTimeExpired(false);
+      handleAutoSubmit();
+    }
+  }, [timeExpired]);
 
   const startSession = () => {
     let selected: Question[] = [];
@@ -461,6 +477,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
 
       {/* ================================== STAGE 2: ACTIVE EXAM SCREEN ================================== */}
       {sessionStage === 'active' && sessionQuestions.length > 0 && (
+        <>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col min-h-[500px] justify-between relative">
           
           {/* Header Progress and Timer with Pause & Exit Controls */}
@@ -623,6 +640,39 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
           </div>
 
         </div>
+
+        {/* Question Number Navigator */}
+        {!isPaused && (
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-6 pb-2">
+            {sessionQuestions.map((q, idx) => {
+              const isCurrent = idx === currentIdx;
+              const isAnswered = selectedAnswers[q.id] !== null && selectedAnswers[q.id] !== undefined;
+
+              let boxStyles = '';
+              if (isAnswered) {
+                boxStyles = 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400';
+              } else {
+                boxStyles = 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800';
+              }
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIdx(idx)}
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-mono font-bold border transition-all cursor-pointer ${boxStyles} ${isCurrent ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-900' : ''}`}
+                  title={`Question ${idx + 1}${isAnswered ? ' (Attempted)' : ' (Unanswered)'}`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+            <div className="w-full flex items-center justify-center gap-4 pt-2 text-[10px] font-mono text-slate-500">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/50 inline-block"></span> Attempted</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-800/50 border border-slate-700 inline-block"></span> Unanswered</span>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* ================================== STAGE 3: POST-PRACTICE REVIEW ================================== */}
