@@ -19,7 +19,9 @@ import {
   Undo,
   Pause,
   Play,
-  LogOut
+  LogOut,
+  Flag,
+  Edit
 } from 'lucide-react';
 
 interface PracticeViewProps {
@@ -32,7 +34,8 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
     topics,
     questions,
     completePracticeSession,
-    practiceSessions
+    practiceSessions,
+    updateQuestion
   } = useAppState();
 
   // Navigation states
@@ -62,6 +65,7 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
   const [loggedReasons, setLoggedReasons] = useState<Record<string, FailureReason>>({}); // questionId -> Reason
   const [loggedNotes, setLoggedNotes] = useState<Record<string, string>>({}); // questionId -> noteText
   const [recentLoggedSession, setRecentLoggedSession] = useState<any>(null);
+  const [flaggedForEdit, setFlaggedForEdit] = useState<Record<string, boolean>>({});
 
   // Handle outside overrides
   useEffect(() => {
@@ -749,9 +753,28 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
                           {isCorrect ? 'Correct Answer' : 'Incorrect/Skipped'}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-slate-500">
-                        Concept: {topics.flatMap(t => t.subtopics.flatMap(st => st.concepts)).find(c => c.id === q.conceptId)?.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-500">
+                          Concept: {topics.flatMap(t => t.subtopics.flatMap(st => st.concepts)).find(c => c.id === q.conceptId)?.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newVal = !(flaggedForEdit[q.id] ?? q.needsEdit);
+                            setFlaggedForEdit(prev => ({ ...prev, [q.id]: newVal }));
+                            updateQuestion(q.id, { needsEdit: newVal });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                            (flaggedForEdit[q.id] ?? q.needsEdit)
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 shadow-sm shadow-amber-500/10'
+                              : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-amber-400 hover:border-amber-500/30'
+                          }`}
+                          title={(flaggedForEdit[q.id] ?? q.needsEdit) ? 'Remove edit flag' : 'Flag this question for editing later in Import tab'}
+                        >
+                          <Flag size={11} />
+                          {(flaggedForEdit[q.id] ?? q.needsEdit) ? 'Flagged for Edit' : 'Flag for Edit'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Question text */}

@@ -28,6 +28,7 @@ export interface Question {
   explanation?: string;
   srsState: SrsState;
   notes?: string;
+  needsEdit?: boolean; // Flagged during practice review for editing later
 }
 
 export interface DifficultySrsState {

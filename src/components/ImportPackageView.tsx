@@ -15,7 +15,8 @@ import {
   Search,
   Calendar,
   History,
-  BookOpen
+  BookOpen,
+  Flag
 } from 'lucide-react';
 import MathText from './MathText';
 
@@ -495,6 +496,7 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                   )
                   .map((item) => {
                     const activeCount = item.questionIds.filter(id => questions.some(q => q.id === id)).length;
+                    const flaggedCount = item.questionIds.filter(id => questions.find(q => q.id === id)?.needsEdit).length;
                     return (
                       <div
                         key={item.id}
@@ -647,7 +649,7 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                     <div key={q.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl">
                                       <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-2 flex-1">
-                                          <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold text-slate-500">Q{qIndex + 1}</span>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                               q.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -656,6 +658,12 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                             }`}>
                                               {q.difficulty}
                                             </span>
+                                            {q.needsEdit && (
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                                                <Flag size={10} />
+                                                Needs Edit
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="text-sm text-slate-200 font-medium">
                                             <MathText content={q.text} />
@@ -671,13 +679,25 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                             ))}
                                           </div>
                                         </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleActiveQuestionEditStart(q)}
-                                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg shrink-0 transition-colors"
-                                        >
-                                          <Edit size={14} />
-                                        </button>
+                                        <div className="flex flex-col gap-2 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleActiveQuestionEditStart(q)}
+                                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                                          >
+                                            <Edit size={14} />
+                                          </button>
+                                          {q.needsEdit && (
+                                            <button
+                                              type="button"
+                                              onClick={() => updateQuestion(q.id, { needsEdit: false })}
+                                              className="p-2 bg-amber-500/10 hover:bg-emerald-500/10 border border-amber-500/30 hover:border-emerald-500/30 text-amber-400 hover:text-emerald-400 rounded-lg transition-all"
+                                              title="Clear edit flag"
+                                            >
+                                              <Flag size={14} />
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   );
@@ -770,6 +790,17 @@ export default function ImportPackageView({ onImportComplete }: ImportPackageVie
                                     <span className="text-amber-500 font-semibold">{activeCount} / {item.questionsCount} active</span>
                                   )}
                                 </span>
+                                {flaggedCount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFullEditStart(item)}
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 font-semibold hover:bg-amber-500/20 transition-all cursor-pointer"
+                                    title="Click to open Full Edit and fix flagged questions"
+                                  >
+                                    <Flag size={10} />
+                                    {flaggedCount} flagged for edit
+                                  </button>
+                                )}
                               </div>
                             </div>
 
