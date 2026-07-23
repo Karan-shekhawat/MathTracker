@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../context/AppStateContext';
 import { Question, FailureReason } from '../types';
+import { getNextPracticeSet } from '../lib/srsEngine';
 import {
   Brain,
   Timer,
@@ -123,37 +124,32 @@ export default function PracticeView({ initialConceptOverrideId, onViewChange }:
   }, [sessionStage, sessionQuestions, isPaused, showExitConfirm]);
 
   const startSession = () => {
-    let pool: Question[] = [];
+    let selected: Question[] = [];
 
     if (isSrsMode) {
-      // Smart SRS filter: Questions whose dueDate is in the past, or all questions sorted by SRS urgency
-      // Priority: (1) Due today or past, (2) lower repetitions, (3) medium/hard difficulty
-      const nowStr = new Date().toISOString();
-      const dueQuestions = questions.filter(q => q.srsState.dueDate <= nowStr);
-      
-      if (dueQuestions.length > 0) {
-        pool = dueQuestions;
-      } else {
-        // If nothing is strictly due, fetch the next review items sorted chronologically
-        pool = [...questions].sort((a, b) => a.srsState.dueDate.localeCompare(b.srsState.dueDate));
-      }
+      // Use the adaptive SRS engine which auto-selects difficulty based on concept mastery:
+      // Easy mastery ≥70% → promote to Medium, Medium mastery ≥70% → promote to Hard
+      selected = getNextPracticeSet(topics, questions, 10);
     } else {
       // Custom concepts filter
       if (selectedConceptIds.length === 0) {
         alert('Please select at least one concept to practice.');
         return;
       }
-      pool = questions.filter(q => selectedConceptIds.includes(q.conceptId));
+      const pool = questions.filter(q => selectedConceptIds.includes(q.conceptId));
+      if (pool.length === 0) {
+        alert('Your library has no questions matching this request. Import a package of questions or build one manually first!');
+        return;
+      }
+      
+      const shuffled = [...pool].sort(() => 0.5 - Math.random());
+      selected = shuffled.slice(0, 10);
     }
 
-    if (pool.length === 0) {
+    if (selected.length === 0) {
       alert('Your library has no questions matching this request. Import a package of questions or build one manually first!');
       return;
     }
-
-    // Pick maximum 10 questions randomly from the selected pool to avoid repetitiveness
-    const shuffled = [...pool].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 10);
 
     setSessionQuestions(selected);
     setCurrentIdx(0);
